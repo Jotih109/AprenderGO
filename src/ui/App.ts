@@ -130,18 +130,23 @@ export class App {
     }
 
     const wrapper = document.querySelector('.board-container-wrapper') as HTMLElement;
-    const quickBar = document.getElementById('board-quick-controls');
+    const isReview = this.mode === 'review';
+    const quickBar = document.getElementById(isReview ? 'review-quick-controls' : 'board-quick-controls');
+    const timelineCard = isReview ? document.getElementById('winrate-chart-card') : null;
+
+    const timelineHeight = timelineCard && timelineCard.style.display !== 'none' ? 96 : 0;
+    const quickBarHeight = quickBar && quickBar.style.display !== 'none' ? quickBar.offsetHeight + 10 : 46;
+    const availableHeight = window.innerHeight - 64 - quickBarHeight - timelineHeight - 24;
 
     const wrapperWidth = wrapper && wrapper.clientWidth > 100 ? wrapper.clientWidth - 16 : window.innerWidth - 650;
-    const quickBarHeight = quickBar ? quickBar.offsetHeight + 18 : 60;
-    const availableHeight = window.innerHeight - 64 - quickBarHeight - 20;
 
     // Expand board to fill available space nicely
-    const targetDim = Math.max(340, Math.min(wrapperWidth, availableHeight, 1080));
+    const targetDim = Math.max(280, Math.min(wrapperWidth, availableHeight, 1080));
 
     this.renderer.resize(targetDim, targetDim, this.boardSize);
-    if (this.mode === 'review') {
+    if (isReview) {
       this.renderReviewState();
+      this.drawWinRateChart();
     } else {
       this.render();
     }
@@ -276,13 +281,22 @@ export class App {
     document.getElementById('btn-review-prev-blunder')?.addEventListener('click', () => this.stepBlunder(-1));
     document.getElementById('btn-review-sandbox-toggle')?.addEventListener('click', () => this.toggleSandboxMode());
     document.getElementById('btn-review-challenge')?.addEventListener('click', () => this.startBlunderChallenge());
+    document.getElementById('btn-review-toggle-numbers')?.addEventListener('click', () => {
+      this.showMoveNumbers = !this.showMoveNumbers;
+      this.renderReviewState();
+    });
+    document.getElementById('btn-review-toggle-coords')?.addEventListener('click', () => {
+      this.showCoordinates = !this.showCoordinates;
+      this.renderReviewState();
+    });
+    document.getElementById('btn-review-open-library')?.addEventListener('click', () => this.openReviewLibrary());
 
     // Replay Controls
-    document.getElementById('btn-replay-start')!.addEventListener('click', () => this.jumpReplay(0));
-    document.getElementById('btn-replay-prev')!.addEventListener('click', () => this.stepReplay(-1));
-    document.getElementById('btn-replay-next')!.addEventListener('click', () => this.stepReplay(1));
-    document.getElementById('btn-replay-end')!.addEventListener('click', () => this.jumpReplay(-1));
-    document.getElementById('btn-replay-autoplay')!.addEventListener('click', () => this.toggleAutoPlay());
+    document.getElementById('btn-replay-start')?.addEventListener('click', () => this.jumpReplay(0));
+    document.getElementById('btn-replay-prev')?.addEventListener('click', () => this.stepReplay(-1));
+    document.getElementById('btn-replay-next')?.addEventListener('click', () => this.stepReplay(1));
+    document.getElementById('btn-replay-end')?.addEventListener('click', () => this.jumpReplay(-1));
+    document.getElementById('btn-replay-autoplay')?.addEventListener('click', () => this.toggleAutoPlay());
 
     // SGF & Image Export
     document.getElementById('btn-export-sgf')!.addEventListener('click', () => {
@@ -724,8 +738,10 @@ export class App {
     document.getElementById('review-summary-card')!.style.display = isReview ? 'block' : 'none';
     document.getElementById('live-eval-card')!.style.display = isReview ? 'none' : 'block';
     document.getElementById('territory-widget-card')!.style.display = isReview ? 'none' : 'block';
+    document.getElementById('board-quick-controls')!.style.display = isReview ? 'none' : 'flex';
+    document.getElementById('review-quick-controls')!.style.display = isReview ? 'flex' : 'none';
     document.getElementById('review-move-details-card')!.style.display = isReview ? 'block' : 'none';
-    document.getElementById('winrate-chart-card')!.style.display = isReview ? 'block' : 'none';
+    document.getElementById('winrate-chart-card')!.style.display = isReview ? 'flex' : 'none';
 
     document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
     if (isReview) {
@@ -734,6 +750,7 @@ export class App {
     } else {
       document.getElementById('tab-play')?.classList.add('active');
     }
+    this.updateBoardSize();
   }
 
   private populateReviewStats(): void {
@@ -888,9 +905,6 @@ export class App {
 
     const ev = this.reviewReport.evaluations[index];
 
-    // Replay board to this move
-    this.jumpReplay(index + 1);
-
     // Update details card
     const letters = 'ABCDEFGHJKLMNOPQRSTUVWXYZ';
     const playedCoord = ev.playedMove ? `${letters[ev.playedMove.x]}${this.boardSize - ev.playedMove.y}` : 'Passou';
@@ -937,6 +951,7 @@ export class App {
 
     this.drawWinRateChart();
     this.renderReviewState();
+    this.updateUI();
   }
 
   private stepReview(delta: number): void {
@@ -1209,6 +1224,11 @@ export class App {
   // -------------------------------------------------------------
 
   private stepReplay(delta: number): void {
+    if (this.mode === 'review') {
+      this.stepReview(delta);
+      return;
+    }
+
     if (this.board.movesList.length === 0) return;
 
     if (this.replayIndex === -1) {
@@ -1220,6 +1240,15 @@ export class App {
   }
 
   private jumpReplay(index: number): void {
+    if (this.mode === 'review') {
+      if (!this.reviewReport) return;
+      const targetIdx = index === -1 || index >= this.board.movesList.length
+        ? this.board.movesList.length - 1
+        : Math.max(0, index === 0 ? 0 : index - 1);
+      this.selectReviewMove(targetIdx);
+      return;
+    }
+
     if (index === -1 || index >= this.board.movesList.length) {
       this.replayIndex = -1;
       this.updateUI();
@@ -1622,10 +1651,26 @@ export class App {
     this.moveHistoryList.innerHTML = '';
     this.board.movesList.forEach((m, idx) => {
       const entry = document.createElement('div');
-      entry.className = `move-entry ${this.replayIndex === idx + 1 || (this.mode === 'review' && this.currentReviewMoveIndex === idx) ? 'active' : ''}`;
+      const isActive = this.replayIndex === idx + 1 || (this.mode === 'review' && this.currentReviewMoveIndex === idx);
+      entry.className = `move-entry ${isActive ? 'active' : ''}`;
       const letters = 'ABCDEFGHJKLMNOPQRSTUVWXYZ';
       const coordStr = m.pass ? 'Passou' : m.resign ? 'Desistiu' : `${letters[m.x]}${this.boardSize - m.y}`;
-      entry.innerHTML = `<span>${idx + 1}.</span> <strong>${m.color === 'black' ? '⚫' : '⚪'}</strong> <span>${coordStr}</span>`;
+
+      let evalDotHtml = '';
+      if (this.mode === 'review' && this.reviewReport && this.reviewReport.evaluations[idx]) {
+        const ev = this.reviewReport.evaluations[idx];
+        evalDotHtml = `<span class="move-eval-dot dot-${ev.classification}" title="${ev.labelPt}"></span>`;
+      }
+
+      entry.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 4px;">
+          <span style="color: var(--text-muted); font-size: 11px; width: 22px;">${idx + 1}.</span>
+          <span style="font-size: 11px;">${m.color === 'black' ? '⚫' : '⚪'}</span>
+          <strong style="color: var(--text-primary); font-size: 11px;">${coordStr}</strong>
+        </div>
+        ${evalDotHtml}
+      `;
+
       entry.addEventListener('click', () => {
         if (this.mode === 'review') {
           this.selectReviewMove(idx);
@@ -1634,9 +1679,15 @@ export class App {
         }
       });
       this.moveHistoryList.appendChild(entry);
+
+      if (isActive && this.mode === 'review') {
+        setTimeout(() => entry.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 10);
+      }
     });
 
-    this.moveHistoryList.scrollTop = this.moveHistoryList.scrollHeight;
+    if (this.replayIndex === -1 && this.mode !== 'review') {
+      this.moveHistoryList.scrollTop = this.moveHistoryList.scrollHeight;
+    }
     this.updateClockDisplays();
   }
 

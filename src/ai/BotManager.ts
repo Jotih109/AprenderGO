@@ -1,6 +1,6 @@
 import { GoBoard } from '../core/GoBoard';
 import { Color, Point } from '../types/go';
-import { BotRequest, BotResponse } from './GoBotWorker';
+import { BotRequest, BotResponse, processBotRequest } from './GoBotWorker';
 
 export class BotManager {
   private worker: Worker | null = null;
@@ -27,10 +27,12 @@ export class BotManager {
       };
 
       this.worker.onerror = (err) => {
-        console.error('Bot Worker Error:', err);
+        console.warn('Bot Worker Error, falling back to in-thread calculation:', err);
+        this.worker = null;
       };
     } catch (e) {
-      console.warn('Web Worker not supported or failed to initialize, will use fallback:', e);
+      console.warn('Web Worker not initialized, will use direct in-thread calculation:', e);
+      this.worker = null;
     }
   }
 
@@ -55,16 +57,13 @@ export class BotManager {
     };
 
     if (!this.worker) {
-      // Fallback: simple legal move pick
-      const legal = board.getLegalMoves(turn);
-      const move = legal.length > 0 ? legal[Math.floor(Math.random() * legal.length)] : null;
-      return {
-        id,
-        bestMove: move,
-        winRate: 0.5,
-        scoreLead: 0,
-        thoughtTimeMs: 10
-      };
+      // Robust direct execution with microtask yielding
+      return new Promise<BotResponse>((resolve) => {
+        setTimeout(() => {
+          const res = processBotRequest(request);
+          resolve(res);
+        }, 16);
+      });
     }
 
     return new Promise<BotResponse>((resolve) => {
@@ -88,3 +87,4 @@ export class BotManager {
     }
   }
 }
+
