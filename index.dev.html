@@ -5,9 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Go Master - Jogo de Go Completo e Profissional (Weiqi / Baduk)</title>
   <meta name="description" content="Jogo de Go (Weiqi / Baduk) completo em português com inteligência artificial multinível (MCTS), análise pós-jogo detalhada, problemas Tsumego, explorador de Joseki e suporte a SGF.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23dc9e4f'/%3E%3Ccircle cx='11' cy='11' r='6' fill='%23141518'/%3E%3Ccircle cx='21' cy='21' r='6' fill='%23f8fafc'/%3E%3C/svg%3E">
+  <meta name="theme-color" content="#0c0e14">
   <link rel="stylesheet" href="/src/styles/main.css">
 </head>
 <body>
+  <noscript>
+    <div style="padding:24px;text-align:center;font-family:sans-serif;color:#f8fafc;">
+      Este jogo precisa de JavaScript habilitado para funcionar.
+    </div>
+  </noscript>
   <!-- Header / Navigation Bar -->
   <header class="app-header">
     <div class="logo-area">
@@ -465,6 +472,9 @@
           Lance 1 de 40 (2%)...
         </div>
       </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="btn-cancel-review">Cancelar Análise</button>
+      </div>
     </div>
   </div>
 
@@ -508,6 +518,9 @@
       <div class="modal-footer">
         <button class="btn btn-primary modal-close-btn" id="btn-close-rules">Entendi, Vamos Jogar!</button>
       </div>
+    </div>
+  </div>
+
   <!-- Modal: Biblioteca de Partidas (Pasta Revisão) -->
   <div class="modal-backdrop" id="modal-review-library">
     <div class="modal-window" style="max-width: 680px;">

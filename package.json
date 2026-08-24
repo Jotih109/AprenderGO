@@ -4,12 +4,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build && powershell -Command \"Copy-Item dist/index.dev.html index.html -Force; Copy-Item dist/index.dev.html JOGAR.html -Force; Copy-Item dist/index.dev.html dist/index.html -Force\"",
-    "preview": "vite preview"
+    "build": "npm run typecheck && vite build && node scripts/postbuild.mjs",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "node scripts/run-tests.mjs",
+    "check": "npm run typecheck && npm run test"
   },
   "dependencies": {
-    "canvas-confetti": "^1.9.4",
-    "lucide": "^0.475.0"
+    "canvas-confetti": "^1.9.4"
   },
   "devDependencies": {
     "@types/canvas-confetti": "^1.9.0",
@@ -17,5 +19,7 @@
     "typescript": "^5.7.3",
     "vite": "^6.1.0",
     "vite-plugin-singlefile": "^2.3.3"
-  }
+  },
+  "description": "Go (Weiqi / Baduk) completo em portugues: IA MCTS com RAVE, analise pos-jogo, tsumego, joseki e suporte a SGF.",
+  "private": true
 }

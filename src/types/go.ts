@@ -16,22 +16,6 @@ export interface Move {
 }
 
 export type GameMode = 'pvp' | 'pve' | 'eve' | 'tsumego' | 'joseki' | 'review';
-export type BotLevel = 1 | 2 | 3 | 4 | 5;
-
-export interface ClockSettings {
-  type: 'none' | 'absolute' | 'byoyomi' | 'fischer';
-  mainTimeSeconds: number;
-  byoyomiPeriods: number;
-  byoyomiPeriodSeconds: number;
-  fischerIncrementSeconds: number;
-}
-
-export interface PlayerClock {
-  mainTimeRemaining: number;
-  byoyomiPeriodsRemaining: number;
-  byoyomiCurrentTime: number;
-  isInByoyomi: boolean;
-}
 
 export type RuleSet = 'japanese' | 'chinese';
 
@@ -79,15 +63,6 @@ export interface JosekiNode {
   category: 'Estrela 4-4' | 'Komoku 3-4' | 'San-San 3-3';
   description: string;
   moves: { x: number; y: number; color: Color; note?: string }[];
-}
-
-export interface AIAnalysisResult {
-  bestMove: Point | null;
-  winRate: number;
-  scoreLead: number;
-  pv: Point[];
-  heatmap: number[][];
-  candidateMoves?: { point: Point; score: number; winRate: number }[];
 }
 
 // -------------------------------------------------------------

@@ -1094,3 +1094,99 @@ canvas#winrate-chart {
   }
 }
 
+
+/* ============================================================
+   ACCESSIBILITY, DISABLED STATES AND SMALL SCREENS
+   ============================================================ */
+
+/* The global `user-select: none` keeps stray drag-selection off the board, but
+   form fields still need to be selectable and copyable. */
+input,
+textarea,
+select,
+.move-explanation-text,
+.review-game-desc,
+#modal-rules-guide .modal-body {
+  user-select: text;
+}
+
+.btn:disabled,
+.btn[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.btn:disabled:hover,
+.btn[disabled]:hover {
+  transform: none;
+  filter: none;
+}
+
+/* Visible keyboard focus, without adding an outline for mouse users. */
+.btn:focus-visible,
+.btn-icon:focus-visible,
+.nav-tab:focus-visible,
+.segmented-btn:focus-visible,
+.form-select:focus-visible,
+textarea:focus-visible,
+.move-entry:focus-visible,
+.puzzle-item:focus-visible,
+.joseki-item:focus-visible {
+  outline: 2px solid var(--accent-gold);
+  outline-offset: 2px;
+}
+
+.move-entry,
+.puzzle-item,
+.joseki-item,
+.alt-move-card,
+.review-game-card {
+  cursor: pointer;
+}
+
+canvas#go-board {
+  touch-action: manipulation;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .app-header {
+    flex-wrap: wrap;
+    height: auto;
+    gap: 8px;
+    padding: 8px 12px;
+  }
+  .nav-tabs {
+    order: 3;
+    width: 100%;
+    overflow-x: auto;
+  }
+  .main-layout {
+    height: auto;
+    padding: 8px;
+  }
+  .board-quick-controls {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 560px) {
+  .logo-tag {
+    display: none;
+  }
+  .sidebar-panel {
+    max-width: 100%;
+  }
+}
