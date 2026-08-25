@@ -1,3 +1,6 @@
+import { ConceptId } from '../data/concepts';
+import { MoveInsight } from '../ai/MoveInsights';
+
 export type Color = 'black' | 'white';
 export type Point = { x: number; y: number };
 export type BoardSize = 19 | 13 | 9;
@@ -84,6 +87,14 @@ export interface AlternativeMove {
   description: string;
 }
 
+export interface StudyTopic {
+  concept: ConceptId;
+  /** How many times this came up as a problem in the game. */
+  occurrences: number;
+  /** Move numbers where it happened, so the learner can jump straight there. */
+  moveNumbers: number[];
+}
+
 export interface MoveEvaluation {
   moveNumber: number;
   color: Color;
@@ -99,6 +110,10 @@ export interface MoveEvaluation {
   bestMove: Point | null;
   alternatives: AlternativeMove[];
   blackWinRateHistory: number; // 0..1 for global chart (Black perspective)
+  /** Plain-language observations derived from the board, not from the win rate. */
+  insights: MoveInsight[];
+  /** How much this move cost, in points on the board rather than percentages. */
+  pointsLost: number;
 }
 
 export interface GameReviewReport {
@@ -111,4 +126,6 @@ export interface GameReviewReport {
     white: Record<MoveClassificationType, number>;
   };
   turningPoints: { moveNumber: number; description: string; impact: string }[];
+  /** What each player should study, most frequent problem first. */
+  studyPlan: { black: StudyTopic[]; white: StudyTopic[] };
 }

@@ -8,6 +8,7 @@ import {
   JosekiNode,
   Move,
   MoveClassificationType,
+  MoveEvaluation,
   Point,
   RuleSet,
   TerritoryScore,
@@ -21,6 +22,8 @@ import { SoundEffects } from '../audio/SoundEffects';
 import { BotManager } from '../ai/BotManager';
 import { BoardRenderer } from './BoardRenderer';
 import { GameReviewer, ReviewCancelledError } from '../ai/GameReviewer';
+import { InsightSeverity } from '../ai/MoveInsights';
+import { CONCEPTS, CONCEPT_ORDER, ConceptId } from '../data/concepts';
 import { TSUMEGO_PROBLEMS } from '../data/tsumegoData';
 import { JOSEKI_PATTERNS } from '../data/josekiData';
 import { PRESET_REVIEW_GAMES, ReviewGamePreset } from '../data/reviewGamesData';
@@ -54,6 +57,7 @@ interface PlayerClockState {
 interface PersistedSettings {
   theme: BoardTheme;
   soundEnabled: boolean;
+  beginnerMode: boolean;
   showCoordinates: boolean;
   showMoveNumbers: boolean;
   botLevel: number;
@@ -94,6 +98,8 @@ export class App {
   private showCoordinates = true;
   private showMoveNumbers = false;
   private showInfluenceMap = false;
+  /** Plain-language review: points instead of percentages. On by default. */
+  private beginnerMode = true;
   private hoverPoint: Point | null = null;
   private aiHint: { point: Point; winRate?: number } | null = null;
 
@@ -138,6 +144,7 @@ export class App {
    */
   private botThinking = false;
   private renderHandle = 0;
+  private resizeHandle = 0;
   private influenceCache: { key: string; result: ReturnType<typeof InfluenceMap.calculate> } | null = null;
   /**
    * Replaying a game from move zero costs one playMove per move, and rendering
@@ -193,6 +200,7 @@ export class App {
     this.moveCountBadge = this.requireElement('move-count-badge');
 
     this.applySettingsToControls();
+    this.updateBeginnerModeLabel();
     this.updatePlayerNames();
     this.initLayout();
     this.bindEvents();
@@ -228,6 +236,7 @@ export class App {
       if (!raw) return;
       const s = JSON.parse(raw) as Partial<PersistedSettings>;
       if (s.theme) this.theme = s.theme;
+      if (typeof s.beginnerMode === 'boolean') this.beginnerMode = s.beginnerMode;
       if (typeof s.showCoordinates === 'boolean') this.showCoordinates = s.showCoordinates;
       if (typeof s.showMoveNumbers === 'boolean') this.showMoveNumbers = s.showMoveNumbers;
       if (typeof s.botLevel === 'number') this.botLevel = s.botLevel;
@@ -247,6 +256,7 @@ export class App {
       const settings: PersistedSettings = {
         theme: this.theme,
         soundEnabled: this.sound.enabled,
+        beginnerMode: this.beginnerMode,
         showCoordinates: this.showCoordinates,
         showMoveNumbers: this.showMoveNumbers,
         botLevel: this.botLevel,
@@ -284,13 +294,33 @@ export class App {
   // -------------------------------------------------------------
 
   private initLayout(): void {
-    const wrapper = document.querySelector('.board-container-wrapper');
-    if (wrapper && typeof ResizeObserver !== 'undefined') {
-      // Reacts to sidebars showing and hiding, not just to window resizes.
-      const observer = new ResizeObserver(() => this.updateBoardSize());
-      observer.observe(wrapper);
+    if (typeof ResizeObserver !== 'undefined') {
+      // The board has to fit in whatever height the bars around it leave. Those
+      // bars change height on their own — the review controls wrap to a second
+      // row, the timeline appears — so watching only the wrapper is not enough:
+      // the wrapper keeps its size while its contents grow, and the board ends
+      // up taller than the space available.
+      const observer = new ResizeObserver(() => this.scheduleBoardResize());
+      for (const selector of [
+        '.board-container-wrapper',
+        '#board-quick-controls',
+        '#review-quick-controls',
+        '#winrate-chart-card'
+      ]) {
+        const el = document.querySelector(selector);
+        if (el) observer.observe(el);
+      }
     }
-    window.addEventListener('resize', () => this.updateBoardSize());
+    window.addEventListener('resize', () => this.scheduleBoardResize());
+  }
+
+  /** Coalesces layout recalculations into one per frame. */
+  private scheduleBoardResize(): void {
+    if (this.resizeHandle !== 0) return;
+    this.resizeHandle = requestAnimationFrame(() => {
+      this.resizeHandle = 0;
+      this.updateBoardSize();
+    });
   }
 
   public updateBoardSize(newSize?: BoardSize): void {
@@ -410,6 +440,9 @@ export class App {
     document.getElementById('btn-review-next-blunder')?.addEventListener('click', () => this.stepBlunder(1));
     document.getElementById('btn-review-prev-blunder')?.addEventListener('click', () => this.stepBlunder(-1));
     document.getElementById('btn-review-sandbox-toggle')?.addEventListener('click', () => this.toggleSandboxMode());
+    document.getElementById('btn-beginner-mode')?.addEventListener('click', () => this.toggleBeginnerMode());
+    document.getElementById('btn-open-glossary')?.addEventListener('click', () => this.openGlossary());
+    document.getElementById('btn-close-glossary')?.addEventListener('click', () => this.closeModal('modal-glossary'));
     document.getElementById('btn-review-challenge')?.addEventListener('click', () => this.startBlunderChallenge());
 
     // Replay transport
@@ -1011,6 +1044,7 @@ export class App {
       this.isChallengeMode = false;
       this.setReviewModeUI(true);
       this.populateReviewStats();
+      this.renderStudyPlan();
       this.selectReviewMove(0);
     } catch (err) {
       this.closeModal('modal-review-progress');
@@ -1208,18 +1242,284 @@ export class App {
 
     const deltaEl = document.getElementById('review-move-delta');
     if (deltaEl) {
-      const deltaPct = (ev.winRateDelta * 100).toFixed(1);
-      deltaEl.textContent = `(${ev.winRateDelta >= 0 ? '+' : ''}${deltaPct}%)`;
-      deltaEl.style.color = ev.winRateDelta < -0.1 ? '#ef4444' : ev.winRateDelta < 0 ? '#eab308' : '#10b981';
+      deltaEl.className = 'move-verdict';
+      deltaEl.textContent = this.verdictText(ev);
+      deltaEl.style.color =
+        ev.winRateDelta <= -0.028 ? '#ef4444' : ev.winRateDelta < -0.005 ? '#eab308' : '#10b981';
     }
 
     const explanation = document.getElementById('review-move-explanation');
-    if (explanation) explanation.textContent = ev.explanation;
+    if (explanation) explanation.textContent = this.explanationText(ev, size);
 
+    this.renderInsights(ev);
     this.renderAlternatives(ev.alternatives, size);
     this.drawWinRateChart();
     this.render();
     this.updateUI();
+  }
+
+  /**
+   * The headline verdict. In beginner mode this is expressed in points on the
+   * board, because "custou uns 4 pontos" means something to someone learning
+   * and "-4.3%" does not.
+   */
+  private verdictText(ev: MoveEvaluation): string {
+    if (!this.beginnerMode) {
+      const pct = (ev.winRateDelta * 100).toFixed(1);
+      return `(${ev.winRateDelta >= 0 ? '+' : ''}${pct}%)`;
+    }
+
+    const points = Math.round(ev.pointsLost);
+    if (ev.classification === 'brilliant') return 'virou o jogo!';
+    if (ev.winRateDelta >= 0.005) return 'jogada certa';
+    if (points <= 0) return 'sem perda';
+    if (points === 1) return 'custou ~1 ponto';
+    return `custou ~${points} pontos`;
+  }
+
+  /**
+   * Beginner mode drops the percentage talk and leans on the concrete
+   * observations instead; the technical wording stays available for anyone who
+   * wants it.
+   */
+  private explanationText(ev: MoveEvaluation, size: BoardSize): string {
+    if (!this.beginnerMode) return ev.explanation;
+
+    const best = ev.bestMove ? GameReviewer.coordToString(ev.bestMove.x, ev.bestMove.y, size) : null;
+
+    switch (ev.classification) {
+      case 'brilliant':
+        return 'Excelente! Esta jogada mudou o rumo da partida a seu favor.';
+      case 'best':
+        return 'Boa jogada — foi exatamente o tipo de lance que a IA também escolheria aqui.';
+      case 'good':
+        return 'Jogada razoável. Mantém a posição equilibrada, sem grandes ganhos nem perdas.';
+      case 'inaccuracy':
+        return best
+          ? `Deu para fazer melhor. ${best} teria aproveitado mais a posição.`
+          : 'Deu para fazer melhor: havia um lance mais eficiente nesta posição.';
+      case 'mistake':
+        return best
+          ? `Esta jogada perdeu uma oportunidade. O lance forte aqui era ${best}.`
+          : 'Esta jogada perdeu uma oportunidade importante.';
+      default:
+        return best
+          ? `Erro sério: esta jogada entregou vantagem ao adversário. O lance certo era ${best}.`
+          : 'Erro sério: esta jogada entregou vantagem ao adversário.';
+    }
+  }
+
+  /** Renders the board-derived observations for the selected move. */
+  private renderInsights(ev: MoveEvaluation): void {
+    const container = document.getElementById('review-insights-list');
+    if (!container) return;
+    container.textContent = '';
+
+    if (ev.insights.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'insight-card severity-info';
+      empty.innerHTML = '';
+      const icon = document.createElement('span');
+      icon.className = 'insight-icon';
+      icon.textContent = '•';
+      const body = document.createElement('div');
+      body.className = 'insight-body';
+      const detail = document.createElement('div');
+      detail.className = 'insight-detail';
+      detail.textContent = 'Lance tranquilo: nada de especial aconteceu no tabuleiro aqui.';
+      body.appendChild(detail);
+      empty.append(icon, body);
+      container.appendChild(empty);
+      return;
+    }
+
+    const icons: Record<InsightSeverity, string> = {
+      critical: '⛔',
+      warning: '⚠️',
+      info: 'ℹ️',
+      good: '✅'
+    };
+
+    // Problems first, and only a few of them: a wall of notes teaches nothing.
+    const order: InsightSeverity[] = ['critical', 'warning', 'good', 'info'];
+    const sorted = [...ev.insights]
+      .sort((a, b) => order.indexOf(a.severity) - order.indexOf(b.severity))
+      .slice(0, 3);
+
+    const fragment = document.createDocumentFragment();
+    for (const insight of sorted) {
+      const card = document.createElement('div');
+      card.className = `insight-card severity-${insight.severity}`;
+
+      const icon = document.createElement('span');
+      icon.className = 'insight-icon';
+      icon.textContent = icons[insight.severity];
+
+      const body = document.createElement('div');
+      body.className = 'insight-body';
+
+      const title = document.createElement('div');
+      title.className = 'insight-title';
+      title.appendChild(document.createTextNode(insight.title));
+
+      const concept = CONCEPTS[insight.concept];
+      if (concept) {
+        const chip = document.createElement('button');
+        chip.className = 'concept-chip';
+        chip.type = 'button';
+        chip.textContent = concept.name;
+        chip.title = concept.short;
+        chip.addEventListener('click', () => this.openGlossary(insight.concept));
+        title.appendChild(chip);
+      }
+
+      const detail = document.createElement('div');
+      detail.className = 'insight-detail';
+      detail.textContent = insight.detail;
+
+      body.append(title, detail);
+      card.append(icon, body);
+      fragment.appendChild(card);
+    }
+
+    container.appendChild(fragment);
+  }
+
+  /** The end-of-game "what to study" list, built from recurring mistakes. */
+  private renderStudyPlan(): void {
+    const container = document.getElementById('review-study-plan');
+    const report = this.reviewReport;
+    if (!container || !report) return;
+    container.textContent = '';
+
+    const fragment = document.createDocumentFragment();
+    let total = 0;
+
+    // Both colours get a list: a loaded game has no single "you", and in your
+    // own games seeing what the opponent kept missing is useful too.
+    for (const side of ['black', 'white'] as const) {
+      const topics = report.studyPlan[side];
+      if (topics.length === 0) continue;
+      total += topics.length;
+
+      const heading = document.createElement('div');
+      heading.className = 'study-topic-count';
+      heading.style.marginTop = '2px';
+      heading.textContent = side === 'black' ? '⚫ Pretas' : '⚪ Brancas';
+      fragment.appendChild(heading);
+
+      for (const topic of topics) {
+        const concept = CONCEPTS[topic.concept];
+        if (!concept) continue;
+
+        const card = document.createElement('div');
+        card.className = 'study-topic';
+
+        const head = document.createElement('div');
+        head.className = 'study-topic-head';
+        const name = document.createElement('span');
+        name.className = 'study-topic-name';
+        name.textContent = concept.name;
+        const count = document.createElement('span');
+        count.className = 'study-topic-count';
+        count.textContent = `${topic.occurrences}x`;
+        head.append(name, count);
+
+        const tip = document.createElement('div');
+        tip.className = 'study-topic-tip';
+        tip.textContent = concept.practice;
+
+        const jump = document.createElement('div');
+        jump.className = 'study-topic-jump';
+        const shown = topic.moveNumbers.slice(0, 6).join(', ');
+        jump.textContent = `Lances ${shown}${topic.moveNumbers.length > 6 ? '…' : ''} — clique para ver o primeiro`;
+
+        card.append(head, tip, jump);
+        card.addEventListener('click', () => {
+          const idx = report.evaluations.findIndex(e => e.moveNumber === topic.moveNumbers[0]);
+          if (idx >= 0) this.selectReviewMove(idx);
+        });
+
+        fragment.appendChild(card);
+      }
+    }
+
+    if (total === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'study-plan-empty';
+      empty.textContent =
+        'Nenhum erro recorrente nesta partida. Continue jogando e revise de novo — ' +
+        'os padrões aparecem melhor depois de algumas partidas.';
+      container.appendChild(empty);
+      return;
+    }
+
+    container.appendChild(fragment);
+  }
+
+  /** Opens the glossary, optionally scrolled to one concept. */
+  public openGlossary(focus?: ConceptId): void {
+    const list = document.getElementById('glossary-list');
+    if (list) {
+      list.textContent = '';
+      const fragment = document.createDocumentFragment();
+
+      for (const id of CONCEPT_ORDER) {
+        const concept = CONCEPTS[id];
+        const entry = document.createElement('div');
+        entry.className = `glossary-entry${focus === id ? ' highlight' : ''}`;
+        entry.id = `glossary-${id}`;
+
+        const name = document.createElement('div');
+        name.className = 'glossary-name';
+        name.textContent = concept.name;
+
+        const short = document.createElement('div');
+        short.className = 'glossary-short';
+        short.textContent = concept.short;
+
+        const explanation = document.createElement('div');
+        explanation.className = 'glossary-explanation';
+        explanation.textContent = concept.explanation;
+
+        const practice = document.createElement('div');
+        practice.className = 'glossary-practice';
+        practice.textContent = `👉 ${concept.practice}`;
+
+        entry.append(name, short, explanation, practice);
+        fragment.appendChild(entry);
+      }
+
+      list.appendChild(fragment);
+    }
+
+    this.openModal('modal-glossary');
+
+    if (focus) {
+      // Wait for the modal to lay out, then scroll only the modal body.
+      window.requestAnimationFrame(() => {
+        const entry = document.getElementById(`glossary-${focus}`);
+        const body = entry?.closest('.modal-body') as HTMLElement | null;
+        if (entry && body) {
+          body.scrollTop = Math.max(0, entry.offsetTop - body.offsetTop - 12);
+        }
+      });
+    }
+  }
+
+  private toggleBeginnerMode(): void {
+    this.beginnerMode = !this.beginnerMode;
+    this.saveSettings();
+    this.updateBeginnerModeLabel();
+    if (this.reviewReport) this.selectReviewMove(this.currentReviewMoveIndex);
+  }
+
+  private updateBeginnerModeLabel(): void {
+    const label = document.getElementById('beginner-mode-label');
+    if (label) label.textContent = this.beginnerMode ? '🌱 Modo Aprendiz: ligado' : '🎓 Modo Técnico';
+    const btn = document.getElementById('btn-beginner-mode');
+    btn?.classList.toggle('btn-primary', this.beginnerMode);
+    btn?.classList.toggle('btn-secondary', !this.beginnerMode);
   }
 
   private renderAlternatives(alternatives: AlternativeMove[], size: BoardSize): void {
@@ -1257,9 +1557,13 @@ export class App {
       rate.style.fontSize = '11px';
       rate.style.fontWeight = '700';
       rate.style.color = '#10b981';
-      rate.textContent = `${(alt.winRate * 100).toFixed(1)}%`;
+      // A raw win-rate percentage is noise for a learner; rank is what matters.
+      rate.textContent = this.beginnerMode
+        ? ['melhor', '2ª opção', '3ª opção'][idx] || 'opção'
+        : `${(alt.winRate * 100).toFixed(1)}%`;
 
       card.append(left, rate);
+      card.title = 'Clique para ver este lance no tabuleiro';
       card.addEventListener('click', () => {
         this.activeAlternative = alt;
         this.render();
@@ -2279,8 +2583,18 @@ export class App {
 
     list.appendChild(fragment);
 
-    if (activeEntry) (activeEntry as HTMLElement).scrollIntoView({ block: 'nearest' });
-    else if (this.replayIndex === -1 && this.mode !== 'review') list.scrollTop = list.scrollHeight;
+    if (activeEntry) {
+      // Scroll the history panel by hand. scrollIntoView walks up and scrolls
+      // every scrollable ancestor, including the document, which drags the
+      // board out from under the header.
+      const el = activeEntry as HTMLElement;
+      const top = el.offsetTop;
+      const bottom = top + el.offsetHeight;
+      if (top < list.scrollTop) list.scrollTop = top;
+      else if (bottom > list.scrollTop + list.clientHeight) list.scrollTop = bottom - list.clientHeight;
+    } else if (this.replayIndex === -1 && this.mode !== 'review') {
+      list.scrollTop = list.scrollHeight;
+    }
   }
 
   /** Coalesces hover-driven repaints into one per animation frame. */

@@ -110,6 +110,17 @@
 
         <!-- Move Breakdown Table -->
         <div class="review-stats-table" id="review-stats-breakdown"></div>
+
+        <!-- O que estudar depois desta partida -->
+        <div class="study-plan-block">
+          <div class="study-plan-header">
+            <span>🎓 O que estudar</span>
+            <button class="btn btn-secondary btn-sm" id="btn-open-glossary" title="Ver todos os conceitos">
+              <span>📚 Glossário</span>
+            </button>
+          </div>
+          <div id="review-study-plan" class="study-plan-list"></div>
+        </div>
       </div>
 
       <!-- Match State / Alert Banner -->
@@ -267,6 +278,9 @@
           <button id="btn-review-open-library" class="btn btn-secondary btn-sm" title="Trocar Partida">
             <span>📁 Biblioteca</span>
           </button>
+          <button id="btn-beginner-mode" class="btn btn-primary btn-sm" title="Explicações simples, sem porcentagens">
+            <span id="beginner-mode-label">🌱 Modo Aprendiz: ligado</span>
+          </button>
         </div>
       </div>
     </section>
@@ -287,6 +301,9 @@
 
         <div id="review-move-explanation" class="move-explanation-text"></div>
 
+        <!-- O que aconteceu neste lance, em linguagem simples -->
+        <div id="review-insights-list" class="insights-container"></div>
+
         <!-- Smart Navigation & Variation Buttons -->
         <div class="review-actions-grid">
           <button id="btn-review-sandbox-toggle" class="btn btn-secondary btn-sm" title="Testar jogadas livremente no tabuleiro">
@@ -299,7 +316,7 @@
 
         <!-- Alternatives Section -->
         <div class="alternatives-header">
-          Alternativas Recomendadas pela IA:
+          O que a IA jogaria no lugar:
         </div>
         <div id="review-alternatives-list" class="alternatives-container"></div>
       </div>
@@ -553,6 +570,26 @@
             </button>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Glossario de conceitos -->
+  <div class="modal-backdrop" id="modal-glossary">
+    <div class="modal-window" style="max-width: 720px;">
+      <div class="modal-header">
+        <h3><span>📚</span> Glossário: os conceitos do Go</h3>
+        <button class="btn-icon modal-close-btn" id="modal-glossary-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="color: var(--text-secondary); font-size: 13px; margin-bottom: 16px;">
+          Cada observação da revisão aponta para um destes conceitos. Se você nunca jogou Go,
+          comece por <strong>Liberdade</strong> e <strong>Atari</strong> — são a base de tudo.
+        </p>
+        <div id="glossary-list" class="glossary-list"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary modal-close-btn" id="btn-close-glossary">Fechar</button>
       </div>
     </div>
   </div>

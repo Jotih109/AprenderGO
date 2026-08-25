@@ -16,6 +16,7 @@
   "devDependencies": {
     "@types/canvas-confetti": "^1.9.0",
     "@types/node": "^22.13.4",
+    "puppeteer-core": "^25.9.0",
     "typescript": "^5.7.3",
     "vite": "^6.1.0",
     "vite-plugin-singlefile": "^2.3.3"

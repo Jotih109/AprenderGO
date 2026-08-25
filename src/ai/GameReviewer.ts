@@ -6,11 +6,14 @@ import {
   Move,
   MoveClassificationType,
   MoveEvaluation,
-  Point
+  Point,
+  StudyTopic
 } from '../types/go';
 import { GoBoard } from '../core/GoBoard';
 import { BotManager } from './BotManager';
 import { BotResponse } from './GoBotWorker';
+import { MoveInsights, MoveInsight } from './MoveInsights';
+import { ConceptId } from '../data/concepts';
 
 export interface ReviewOptions {
   /** Thinking time per analysed position. */
@@ -113,6 +116,30 @@ export class GameReviewer {
   }
 
   /**
+   * Ranks the concepts a player kept getting wrong, so the report can end with
+   * something actionable instead of a score. Only problems count: a concept the
+   * player handled well never lands on the study list.
+   */
+  private static buildStudyPlan(evaluations: MoveEvaluation[], color: Color): StudyTopic[] {
+    const tally = new Map<ConceptId, number[]>();
+
+    for (const ev of evaluations) {
+      if (ev.color !== color) continue;
+      for (const insight of ev.insights) {
+        if (insight.severity !== 'critical' && insight.severity !== 'warning') continue;
+        const list = tally.get(insight.concept) ?? [];
+        list.push(ev.moveNumber);
+        tally.set(insight.concept, list);
+      }
+    }
+
+    return [...tally.entries()]
+      .map(([concept, moveNumbers]) => ({ concept, occurrences: moveNumbers.length, moveNumbers }))
+      .sort((a, b) => b.occurrences - a.occurrences)
+      .slice(0, 4);
+  }
+
+  /**
    * Analyses a full game.
    *
    * The evaluation after move N is the same position, with the same side to
@@ -130,6 +157,9 @@ export class GameReviewer {
     options: ReviewOptions = {}
   ): Promise<GameReviewReport> {
     const timeBudgetMs = options.timeBudgetMs ?? 320;
+    // Rough conversion from win-rate swing to points on the board, so the UI
+    // can say "custou cerca de 4 pontos" instead of quoting a percentage.
+    const boardPointScale = initialSize === 9 ? 45 : initialSize === 13 ? 90 : 180;
     const totalMoves = moves.length;
     const evaluations: MoveEvaluation[] = [];
 
@@ -170,6 +200,9 @@ export class GameReviewer {
       }
 
       const ownAtariBefore = this.findAtariGroups(board, turnColor);
+      // Read the position before the move so the teaching notes can compare.
+      const preFacts = MoveInsights.capture(board, move);
+      const boardBefore = move.pass || move.resign ? null : board.clone();
 
       // Position before the move, from the mover's point of view.
       //
@@ -218,10 +251,21 @@ export class GameReviewer {
           explanation: `${turnColor === 'black' ? 'Pretas' : 'Brancas'} desistiram da partida.`,
           bestMove: bestMoveBefore,
           alternatives: [],
-          blackWinRateHistory: evaluations.length > 0 ? evaluations[evaluations.length - 1].blackWinRateHistory : 0.5
+          blackWinRateHistory: evaluations.length > 0 ? evaluations[evaluations.length - 1].blackWinRateHistory : 0.5,
+          insights: [],
+          pointsLost: 0
         });
         break;
       }
+
+      const insights: MoveInsight[] = MoveInsights.analyze(
+        board,
+        preFacts,
+        move,
+        moveNum,
+        initialSize,
+        capturedCount
+      );
 
       // Position after the move, evaluated once and reused as the next "before".
       const afterAnalysis = await botManager.analyzePosition(board, board.turn, komi, {
@@ -309,12 +353,16 @@ export class GameReviewer {
         const key = `${cand.point.x},${cand.point.y}`;
         if (seen.has(key)) continue;
         seen.add(key);
-        const candWinRate = turnColor === 'black' ? cand.winRate : cand.winRate;
+        // Say what the move accomplishes, verified by replaying it, instead of
+        // quoting a simulation count that means nothing to a learner.
+        const reason = boardBefore
+          ? MoveInsights.describeCandidate(boardBefore, cand.point, turnColor, initialSize)
+          : 'ocupa um ponto melhor';
         alternatives.push({
           point: cand.point,
-          winRate: candWinRate,
+          winRate: cand.winRate,
           scoreLead: beforeAnalysis.scoreLead,
-          description: `${this.coordToString(cand.point.x, cand.point.y, initialSize)} — ${(candWinRate * 100).toFixed(1)}% de vitória em ${cand.score} simulações`
+          description: reason
         });
         if (alternatives.length >= 3) break;
       }
@@ -333,7 +381,9 @@ export class GameReviewer {
         explanation,
         bestMove: bestMoveBefore,
         alternatives,
-        blackWinRateHistory: blackWinRateAfter
+        blackWinRateHistory: blackWinRateAfter,
+        insights,
+        pointsLost: Math.max(0, -delta) * boardPointScale
       });
     }
 
@@ -361,7 +411,11 @@ export class GameReviewer {
       whiteAccuracyPct: calcAccuracy('white'),
       evaluations,
       stats,
-      turningPoints
+      turningPoints,
+      studyPlan: {
+        black: this.buildStudyPlan(evaluations, 'black'),
+        white: this.buildStudyPlan(evaluations, 'white')
+      }
     };
   }
 }
