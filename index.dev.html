@@ -15,135 +15,151 @@
       Este jogo precisa de JavaScript habilitado para funcionar.
     </div>
   </noscript>
-  <!-- Header / Navigation Bar -->
-  <header class="app-header">
-    <div class="logo-area">
-      <div class="logo-symbol">碁</div>
+
+  <!-- ================================================================= -->
+  <!-- 1. CABEÇALHO PRINCIPAL E NAVEGAÇÃO SUPERIOR                       -->
+  <!-- ================================================================= -->
+  <header class="app-header" role="banner">
+    <!-- Logotipo e Marca -->
+    <div class="logo-area" title="Go Master - Baduk & Weiqi Sensei">
+      <div class="logo-symbol" aria-hidden="true">碁</div>
       <div class="logo-title">GO MASTER</div>
       <div class="logo-tag">PRO BADUK</div>
     </div>
 
-    <nav class="nav-tabs">
-      <button class="nav-tab active" id="tab-play" data-mode="play">
-        <span>Partida</span>
+    <!-- Navegação por Modos de Jogo / Estudo -->
+    <nav class="nav-tabs" aria-label="Navegação de Modos">
+      <button class="nav-tab active" id="tab-play" data-mode="play" title="Jogar Partida de Go">
+        <span>🎮 Partida</span>
       </button>
-      <button class="nav-tab" id="tab-review" data-mode="review">
+      <button class="nav-tab" id="tab-review" data-mode="review" title="Análise Pós-Jogo e Revisão com IA">
         <span>📊 Revisão Pós-Jogo</span>
       </button>
-      <button class="nav-tab" id="tab-tsumego" data-mode="tsumego">
-        <span>Tsumego (Puzzles)</span>
+      <button class="nav-tab" id="tab-tsumego" data-mode="tsumego" title="Resolver Desafios de Vida e Morte (Tsumego)">
+        <span>🧩 Tsumego</span>
       </button>
-      <button class="nav-tab" id="tab-joseki" data-mode="joseki">
-        <span>Joseki (Aberturas)</span>
+      <button class="nav-tab" id="tab-joseki" data-mode="joseki" title="Explorador de Sequências de Abertura nos Cantos">
+        <span>📖 Joseki</span>
       </button>
-      <button class="nav-tab" id="tab-rules" data-mode="rules">
-        <span>Regras & Guia</span>
+      <button class="nav-tab" id="tab-rules" data-mode="rules" title="Guia Completo de Regras e Conceitos">
+        <span>📜 Regras & Guia</span>
       </button>
     </nav>
 
+    <!-- Ações e Configurações Rápidas -->
     <div class="header-actions">
-      <select id="theme-select" class="form-select" style="width: 140px; padding: 6px 10px; font-size: 12px;">
-        <option value="kaya">Kaya Tradicional</option>
-        <option value="dark">Estúdio Noturno</option>
-        <option value="cyber">Cyber Baduk</option>
-        <option value="washi">Papel Washi</option>
+      <!-- Seletor de Tema Visual do Tabuleiro -->
+      <select id="theme-select" class="form-select" title="Escolha o tema visual do tabuleiro" style="width: 140px; padding: 6px 10px; font-size: 12px;">
+        <option value="kaya">🪵 Kaya Tradicional</option>
+        <option value="dark">🌑 Estúdio Noturno</option>
+        <option value="cyber">⚡ Cyber Baduk</option>
+        <option value="washi">📜 Papel Washi</option>
       </select>
 
-      <button id="btn-sound-toggle" class="btn-icon" title="Alternar Som">
+      <!-- Alternador de Som / Efeitos -->
+      <button id="btn-sound-toggle" class="btn-icon" title="Alternar Efeitos Sonoros">
         <span id="sound-icon">🔊</span>
       </button>
 
-      <button id="btn-new-game-modal" class="btn btn-primary btn-sm">
+      <!-- Botão Nova Partida -->
+      <button id="btn-new-game-modal" class="btn btn-primary btn-sm" title="Criar uma nova partida personalizada">
         <span>+ Nova Partida</span>
       </button>
     </div>
   </header>
 
-  <!-- Main Game Layout -->
-  <main class="main-layout" id="main-layout">
-    <!-- Left Sidebar: Players, Match Info, Review Summary, SGF Tools -->
-    <aside class="sidebar-panel" id="sidebar-left">
-      <!-- Live Game Player Cards -->
+  <!-- ================================================================= -->
+  <!-- 2. LAYOUT PRINCIPAL: PAINEL ESQUERDO, TABULEIRO E PAINEL DIREITO  -->
+  <!-- ================================================================= -->
+  <main class="main-layout" id="main-layout" role="main">
+
+    <!-- ------------------------------------------------------------- -->
+    <!-- 2.1 PAINEL LATERAL ESQUERDO: Jogadores, Resumo e Ferramentas  -->
+    <!-- ------------------------------------------------------------- -->
+    <aside class="sidebar-panel" id="sidebar-left" aria-label="Painel de Informações da Partida">
+
+      <!-- Cartões dos Jogadores (Modo Ao Vivo) -->
       <div id="live-player-cards">
-        <!-- Black Player Card -->
+        <!-- Jogador Pretas (Joga 1º) -->
         <div class="player-card active-turn" id="card-black">
           <div class="player-info">
-            <div class="player-stone-indicator stone-black-bg"></div>
+            <div class="player-stone-indicator stone-black-bg" aria-hidden="true"></div>
             <div class="player-name-wrap">
               <span class="player-name" id="name-black">Pretas (Humano)</span>
               <span class="player-captures" id="captures-black">Prisioneiros: 0</span>
             </div>
           </div>
-          <div class="player-timer" id="timer-black">10:00</div>
+          <div class="player-timer" id="timer-black" title="Tempo restante">10:00</div>
         </div>
 
-        <!-- White Player Card -->
+        <!-- Jogador Brancas (+Komi de Compensação) -->
         <div class="player-card" id="card-white">
           <div class="player-info">
-            <div class="player-stone-indicator stone-white-bg"></div>
+            <div class="player-stone-indicator stone-white-bg" aria-hidden="true"></div>
             <div class="player-name-wrap">
               <span class="player-name" id="name-white">Brancas (Bot Nv. 3)</span>
               <span class="player-captures" id="captures-white">Prisioneiros: 0 (+6.5 Komi)</span>
             </div>
           </div>
-          <div class="player-timer" id="timer-white">10:00</div>
+          <div class="player-timer" id="timer-white" title="Tempo restante">10:00</div>
         </div>
       </div>
 
-      <!-- Review Mode Match Summary (Shown during Post-Game Review) -->
+      <!-- Relatório Geral da Análise (Exibido no Modo Revisão) -->
       <div class="card review-card" id="review-summary-card" style="display: none;">
         <div class="card-title">
           <span>📊 Relatório Geral</span>
           <span class="card-subtitle-badge">IA Sensei</span>
         </div>
 
+        <!-- Métricas de Precisão Global -->
         <div class="accuracy-metrics-grid">
-          <div class="accuracy-metric-card black-metric">
+          <div class="accuracy-metric-card black-metric" title="Precisão de jogada das Pretas calculada pela IA">
             <div class="metric-player-label">⚫ Pretas</div>
             <div class="metric-score" id="review-acc-black">92%</div>
           </div>
-          <div class="accuracy-metric-card white-metric">
+          <div class="accuracy-metric-card white-metric" title="Precisão de jogada das Brancas calculada pela IA">
             <div class="metric-player-label">⚪ Brancas</div>
             <div class="metric-score" id="review-acc-white">84%</div>
           </div>
         </div>
 
-        <!-- Move Breakdown Table -->
+        <!-- Tabela de Distribuição de Classificação de Lances -->
         <div class="review-stats-table" id="review-stats-breakdown"></div>
 
         <!-- Resumo Textual do Sensei (Diagnóstico em Linguagem Natural) -->
         <div class="sensei-summary-block">
           <div class="sensei-summary-header">
             <div class="sensei-title-wrap">
-              <span class="sensei-icon">🥋</span>
+              <span class="sensei-icon" aria-hidden="true">🥋</span>
               <span class="sensei-heading">Resumo do Sensei</span>
             </div>
             <div class="sensei-header-actions">
-              <button class="btn btn-secondary btn-xs" id="btn-copy-review-text" title="Copiar resumo em texto">
+              <button class="btn btn-secondary btn-xs" id="btn-copy-review-text" title="Copiar diagnóstico em texto formatado para a área de transferência">
                 <span id="copy-btn-icon">📋</span> <span id="copy-btn-text">Copiar</span>
               </button>
-              <button class="btn btn-secondary btn-xs" id="btn-view-full-text-modal" title="Abrir texto completo">
+              <button class="btn btn-secondary btn-xs" id="btn-view-full-text-modal" title="Visualizar relatório em texto corrido completo">
                 <span>📖 Texto</span>
               </button>
             </div>
           </div>
 
-          <!-- Switcher: Geral | Pretas | Brancas -->
-          <div class="sensei-tabs" id="sensei-summary-tabs">
-            <button type="button" class="sensei-tab-btn active" data-tab="general">Geral</button>
-            <button type="button" class="sensei-tab-btn" data-tab="black">⚫ Pretas</button>
-            <button type="button" class="sensei-tab-btn" data-tab="white">⚪ Brancas</button>
+          <!-- Abas de Alternância: Visão Geral | Pretas | Brancas -->
+          <div class="sensei-tabs" id="sensei-summary-tabs" role="tablist">
+            <button type="button" class="sensei-tab-btn active" data-tab="general" role="tab" title="Visão geral e narrativa da partida">Geral</button>
+            <button type="button" class="sensei-tab-btn" data-tab="black" role="tab" title="Pontos fortes e fracos das Pretas">⚫ Pretas</button>
+            <button type="button" class="sensei-tab-btn" data-tab="white" role="tab" title="Pontos fortes e fracos das Brancas">⚪ Brancas</button>
           </div>
 
-          <!-- Tab Content Container -->
-          <div id="sensei-tab-content" class="sensei-content-area"></div>
+          <!-- Conteúdo Injetado Dinamicamente -->
+          <div id="sensei-tab-content" class="sensei-content-area" aria-live="polite"></div>
         </div>
 
         <!-- O que estudar depois desta partida -->
         <div class="study-plan-block">
           <div class="study-plan-header">
             <span>🎓 O que estudar</span>
-            <button class="btn btn-secondary btn-sm" id="btn-open-glossary" title="Ver todos os conceitos">
+            <button class="btn btn-secondary btn-sm" id="btn-open-glossary" title="Ver glossário completo com todos os conceitos">
               <span>📚 Glossário</span>
             </button>
           </div>
@@ -151,13 +167,13 @@
         </div>
       </div>
 
-      <!-- Match State / Alert Banner -->
+      <!-- Banner de Status / Vez do Jogador -->
       <div class="game-status-banner" id="game-status-banner">
-        <span id="status-icon">🎯</span>
+        <span id="status-icon" aria-hidden="true">🎯</span>
         <span id="status-text">Vez das Pretas (Jogada 1)</span>
       </div>
 
-      <!-- Realtime Win Rate / Evaluation Bar (Live Play) -->
+      <!-- Barra de Avaliação em Tempo Real (Modo Ao Vivo) -->
       <div class="card" id="live-eval-card">
         <div class="card-title">
           <span>Avaliação da Posição</span>
@@ -174,46 +190,46 @@
         </div>
       </div>
 
-      <!-- Study Mode Box (Tsumego / Joseki details) -->
+      <!-- Caixa de Detalhes para Modos de Estudo (Tsumego / Joseki) -->
       <div class="card" id="special-mode-card" style="display: none;">
         <div class="card-title" id="special-mode-title">Tsumego</div>
         <div id="special-mode-body" style="font-size: 13px; line-height: 1.5; color: var(--text-secondary);"></div>
       </div>
 
-      <!-- Territorial Estimation Widget -->
+      <!-- Estimativa Territorial em Tempo Real -->
       <div class="card" id="territory-widget-card">
         <div class="card-title">
           <span>Estimativa de Território</span>
           <span style="font-size: 11px; color: var(--text-muted);">Tempo Real</span>
         </div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px;">
-          <div style="background: rgba(0,0,0,0.3); padding: 8px; border-radius: var(--radius-sm);">
-            <div style="color: var(--text-muted); font-size: 11px;">Território Preto</div>
-            <div style="font-weight: 700; font-size: 16px;" id="est-black-pts">0 pts</div>
+        <div class="territory-grid">
+          <div class="territory-box">
+            <div class="territory-box-label">Território Preto</div>
+            <div class="territory-box-value" id="est-black-pts">0 pts</div>
           </div>
-          <div style="background: rgba(0,0,0,0.3); padding: 8px; border-radius: var(--radius-sm);">
-            <div style="color: var(--text-muted); font-size: 11px;">Território Branco</div>
-            <div style="font-weight: 700; font-size: 16px;" id="est-white-pts">6.5 pts</div>
+          <div class="territory-box">
+            <div class="territory-box-label">Território Branco</div>
+            <div class="territory-box-value" id="est-white-pts">6.5 pts</div>
           </div>
         </div>
       </div>
 
-      <!-- SGF and Export Tools (Located in Left Sidebar for optimal balance) -->
+      <!-- Ferramentas de SGF, Exportação e Biblioteca -->
       <div class="card" id="sgf-tools-card">
         <div class="card-title">
           <span>📁 Partidas & SGF</span>
         </div>
         <div class="sgf-actions-grid">
-          <button id="btn-open-library-sidebar" class="btn btn-secondary btn-sm full-span" title="Explorar partidas gravadas">
+          <button id="btn-open-library-sidebar" class="btn btn-secondary btn-sm full-span" title="Explorar partidas gravadas da pasta Revisão">
             <span>📂 Biblioteca da Pasta Revisão</span>
           </button>
           <button id="btn-import-sgf-trigger" class="btn btn-secondary btn-sm" title="Carregar arquivo SGF do computador">
             <span>📥 Carregar SGF</span>
           </button>
-          <button id="btn-export-sgf" class="btn btn-secondary btn-sm" title="Salvar partida atual em arquivo .SGF">
+          <button id="btn-export-sgf" class="btn btn-secondary btn-sm" title="Salvar partida atual em arquivo .SGF compatível com OGS/KGS">
             <span>💾 Baixar SGF</span>
           </button>
-          <button id="btn-paste-sgf-trigger" class="btn btn-secondary btn-sm full-span" title="Colar texto SGF diretamente">
+          <button id="btn-paste-sgf-trigger" class="btn btn-secondary btn-sm full-span" title="Colar texto de código SGF diretamente">
             <span>📋 Colar Código SGF</span>
           </button>
           <input type="file" id="sgf-file-input" accept=".sgf" style="display: none;" />
@@ -224,13 +240,16 @@
       </div>
     </aside>
 
-    <!-- Center: Go Board Canvas, Timeline Chart & Controls -->
-    <section class="board-container-wrapper" id="board-container-wrapper">
+    <!-- ------------------------------------------------------------- -->
+    <!-- 2.2 ÁREA CENTRAL: Tabuleiro de Go (Canvas) e Controles         -->
+    <!-- ------------------------------------------------------------- -->
+    <section class="board-container-wrapper" id="board-container-wrapper" aria-label="Área de Jogo">
+      <!-- Container do Canvas do Tabuleiro (Goban) -->
       <div class="board-canvas-holder" id="board-canvas-holder">
-        <canvas id="go-board"></canvas>
+        <canvas id="go-board" width="600" height="600"></canvas>
       </div>
 
-      <!-- Review Mode: Full-Width Win Rate Timeline Scrub Bar -->
+      <!-- Linha do Tempo de Probabilidade de Vitória (Modo Revisão) -->
       <div class="card review-timeline-card" id="winrate-chart-card" style="display: none;">
         <div class="timeline-header">
           <span class="timeline-title">📈 Probabilidade de Vitória ao Longo da Partida</span>
@@ -246,128 +265,140 @@
         </div>
       </div>
 
-      <!-- Live Match Quick Controls (Shown during normal play) -->
+      <!-- Barra de Ações Rápidas da Partida (Modo Ao Vivo) -->
       <div class="board-quick-controls" id="board-quick-controls">
-        <button id="btn-undo" class="btn btn-secondary btn-sm" title="Desfazer Jogada (Ctrl+Z ou U)">
+        <button id="btn-undo" class="btn btn-secondary btn-sm" title="Desfazer Jogada (Atalho: Ctrl+Z ou U)">
           <span>↩ Desfazer</span>
         </button>
-        <button id="btn-pass" class="btn btn-secondary btn-sm" title="Passar a Vez (Espaço)">
+        <button id="btn-pass" class="btn btn-secondary btn-sm" title="Passar a Vez (Atalho: Espaço)">
           <span>Passar</span>
         </button>
-        <button id="btn-hint" class="btn btn-secondary btn-sm" title="Dica da IA (H)">
+        <button id="btn-hint" class="btn btn-secondary btn-sm" title="Pedir Dica para a IA (Atalho: H)">
           <span>💡 Dica IA</span>
         </button>
-        <button id="btn-toggle-influence" class="btn btn-secondary btn-sm" title="Mapa de Calor de Território (T)">
+        <button id="btn-toggle-influence" class="btn btn-secondary btn-sm" title="Mapa de Calor de Influência e Território (Atalho: T)">
           <span id="influence-label">🌐 Influência</span>
         </button>
-        <button id="btn-toggle-numbers" class="btn btn-secondary btn-sm" title="Números das Jogadas">
+        <button id="btn-toggle-numbers" class="btn btn-secondary btn-sm" title="Exibir ou ocultar números das jogadas nas pedras">
           <span>🔢 Números</span>
         </button>
-        <button id="btn-toggle-coords" class="btn btn-secondary btn-sm" title="Coordenadas">
+        <button id="btn-toggle-coords" class="btn btn-secondary btn-sm" title="Exibir ou ocultar coordenadas de A-T e 1-19">
           <span>🔤 Coords</span>
         </button>
-        <button id="btn-open-library-quick" class="btn btn-secondary btn-sm" title="Abrir Partidas da Pasta Revisão">
+        <button id="btn-open-library-quick" class="btn btn-secondary btn-sm" title="Abrir biblioteca de partidas da pasta Revisão">
           <span>📁 Pasta Revisão</span>
         </button>
-        <button id="btn-review-trigger" class="btn btn-primary btn-sm" title="Iniciar Análise Pós-Jogo Completa">
+        <button id="btn-review-trigger" class="btn btn-primary btn-sm" title="Iniciar análise pós-jogo completa com a IA">
           <span>📊 Analisar com IA</span>
         </button>
-        <button id="btn-resign" class="btn btn-danger btn-sm" title="Abandonar Partida">
+        <button id="btn-resign" class="btn btn-danger btn-sm" title="Desistir da Partida">
           <span>Desistir</span>
         </button>
       </div>
 
-      <!-- Review Controller Bar (Active during Review Mode) -->
+      <!-- Barra de Controle e Navegação de Lances (Modo Revisão) -->
       <div class="board-quick-controls review-controller-bar" id="review-quick-controls" style="display: none;">
+        <!-- Navegação de Replay -->
         <div class="review-nav-group">
           <button id="btn-replay-start" class="btn btn-secondary btn-sm" title="Início da Partida (Home)">⏮ Início</button>
           <button id="btn-replay-prev" class="btn btn-secondary btn-sm" title="Lance Anterior (Seta Esquerda)">◀ Anterior</button>
-          <button id="btn-replay-autoplay" class="btn btn-secondary btn-sm" title="Auto-Reproduzir">▶ Auto</button>
+          <button id="btn-replay-autoplay" class="btn btn-secondary btn-sm" title="Auto-Reproduzir Partida">▶ Auto</button>
           <button id="btn-replay-next" class="btn btn-secondary btn-sm" title="Próximo Lance (Seta Direita)">Próximo ▶</button>
           <button id="btn-replay-end" class="btn btn-secondary btn-sm" title="Fim da Partida (End)">Fim ⏭</button>
         </div>
 
+        <!-- Navegação por Erros Críticos -->
         <div class="review-nav-group blunder-nav-group">
-          <button id="btn-review-prev-blunder" class="btn btn-secondary btn-sm" title="Ir para o erro anterior">
+          <button id="btn-review-prev-blunder" class="btn btn-secondary btn-sm" title="Ir para o erro crítico anterior">
             <span>⏮ Erro Ant.</span>
           </button>
-          <button id="btn-review-next-blunder" class="btn btn-warning btn-sm" title="Pular para o próximo erro crítico">
+          <button id="btn-review-next-blunder" class="btn btn-warning btn-sm" title="Pular direto para o próximo erro crítico da partida">
             <span>☠️ Próx. Erro</span>
           </button>
         </div>
 
+        <!-- Ferramentas Visuais e Didáticas -->
         <div class="review-nav-group">
-          <button id="btn-review-toggle-numbers" class="btn btn-secondary btn-sm" title="Alternar Números">
+          <button id="btn-review-toggle-numbers" class="btn btn-secondary btn-sm" title="Alternar Números nas Pedras">
             <span>🔢 Números</span>
           </button>
           <button id="btn-review-toggle-coords" class="btn btn-secondary btn-sm" title="Alternar Coordenadas">
             <span>🔤 Coords</span>
           </button>
-          <button id="btn-review-open-library" class="btn btn-secondary btn-sm" title="Trocar Partida">
+          <button id="btn-review-open-library" class="btn btn-secondary btn-sm" title="Trocar Partida da Biblioteca">
             <span>📁 Biblioteca</span>
           </button>
-          <button id="btn-beginner-mode" class="btn btn-primary btn-sm" title="Explicações simples, sem porcentagens">
+          <button id="btn-beginner-mode" class="btn btn-primary btn-sm" title="Alternar entre explicações simples (Modo Aprendiz) e porcentagens (Modo Técnico)">
             <span id="beginner-mode-label">🌱 Modo Aprendiz: ligado</span>
           </button>
         </div>
       </div>
     </section>
 
-    <!-- Right Sidebar: Move Analysis & Move History -->
-    <aside class="sidebar-panel" id="sidebar-right">
-      <!-- Post-Game Review Move Card (Active during Review Mode) -->
+    <!-- ------------------------------------------------------------- -->
+    <!-- 2.3 PAINEL LATERAL DIREITO: Análise do Lance e Histórico      -->
+    <!-- ------------------------------------------------------------- -->
+    <aside class="sidebar-panel" id="sidebar-right" aria-label="Análise e Histórico de Jogadas">
+      <!-- Cartão de Análise do Lance Selecionado (Modo Revisão) -->
       <div class="card review-move-card" id="review-move-details-card" style="display: none;">
         <div class="card-title">
           <span>Análise do Lance</span>
           <span id="review-move-badge" class="badge-move-eval">🟢 Melhor</span>
         </div>
 
+        <!-- Cabeçalho do Lance: Número, Jogador, Coordenada e Veredito -->
         <div class="move-header-info">
           <strong id="review-move-title" class="move-title-text">Lance 1 (Pretas): E5</strong>
           <span id="review-move-delta" class="move-delta-text">(+0.0%)</span>
         </div>
 
+        <!-- Explicação do Lance da IA -->
         <div id="review-move-explanation" class="move-explanation-text"></div>
 
-        <!-- O que aconteceu neste lance, em linguagem simples -->
+        <!-- Observações Concretas do Tabuleiro (Linguagem Simples) -->
         <div id="review-insights-list" class="insights-container"></div>
 
-        <!-- Smart Navigation & Variation Buttons -->
+        <!-- Ações de Treino e Sandbox de Variações -->
         <div class="review-actions-grid">
-          <button id="btn-review-sandbox-toggle" class="btn btn-secondary btn-sm" title="Testar jogadas livremente no tabuleiro">
+          <button id="btn-review-sandbox-toggle" class="btn btn-secondary btn-sm" title="Testar jogadas livremente no tabuleiro sem alterar a partida">
             <span id="sandbox-btn-label">💡 Testar Variações (E se...?)</span>
           </button>
-          <button id="btn-review-challenge" class="btn btn-primary btn-sm" title="Desafio: Encontre a jogada ideal aqui">
+          <button id="btn-review-challenge" class="btn btn-primary btn-sm" title="Desafio: Encontre a melhor jogada sugerida pela IA">
             <span>🎯 Treinar Este Erro</span>
           </button>
         </div>
 
-        <!-- Alternatives Section -->
+        <!-- Seção de Melhores Alternativas da IA -->
         <div class="alternatives-header">
           O que a IA jogaria no lugar:
         </div>
         <div id="review-alternatives-list" class="alternatives-container"></div>
       </div>
 
-      <!-- Moves History -->
+      <!-- Histórico Completo de Jogadas -->
       <div class="card moves-history-card" id="moves-history-card" style="flex: 1; display: flex; flex-direction: column;">
         <div class="card-title">
           <span>Histórico de Jogadas</span>
           <span id="move-count-badge" class="history-count-badge">0 lances</span>
         </div>
-        <div class="move-history-panel" id="move-history-list"></div>
+        <div class="move-history-panel" id="move-history-list" aria-label="Lista de Jogadas"></div>
       </div>
     </aside>
   </main>
 
-  <!-- Modal: Nova Partida / Configurações -->
-  <div class="modal-backdrop" id="modal-new-game">
+  <!-- ================================================================= -->
+  <!-- 3. MODAIS E CAIXAS DE DIÁLOGO DO SISTEMA                          -->
+  <!-- ================================================================= -->
+
+  <!-- Modal 3.1: Configurar Nova Partida -->
+  <div class="modal-backdrop" id="modal-new-game" role="dialog" aria-modal="true">
     <div class="modal-window">
       <div class="modal-header">
         <h3><span>🎮</span> Configurar Nova Partida</h3>
-        <button class="btn-icon modal-close-btn" id="modal-new-game-close">✕</button>
+        <button class="btn-icon modal-close-btn" id="modal-new-game-close" aria-label="Fechar modal">✕</button>
       </div>
       <div class="modal-body">
+        <!-- Modo de Jogo -->
         <div class="form-group">
           <label class="form-label">Modo de Jogo</label>
           <div class="segmented-control" id="control-game-mode">
@@ -377,6 +408,7 @@
           </div>
         </div>
 
+        <!-- Nível da IA -->
         <div class="form-group" id="group-bot-level">
           <label class="form-label">Nível da Inteligência Artificial</label>
           <select id="select-bot-level" class="form-select">
@@ -388,6 +420,7 @@
           </select>
         </div>
 
+        <!-- Cor das Pedras -->
         <div class="form-group" id="group-player-color">
           <label class="form-label">Sua Cor de Pedra</label>
           <div class="segmented-control" id="control-player-color">
@@ -397,6 +430,7 @@
           </div>
         </div>
 
+        <!-- Tamanho do Tabuleiro -->
         <div class="form-group">
           <label class="form-label">Tamanho do Tabuleiro</label>
           <div class="segmented-control" id="control-board-size">
@@ -406,6 +440,7 @@
           </div>
         </div>
 
+        <!-- Pedras de Handicap (Vantagem) -->
         <div class="form-group">
           <label class="form-label">Pedras de Handicap (Vantagem)</label>
           <select id="select-handicap" class="form-select">
@@ -421,6 +456,7 @@
           </select>
         </div>
 
+        <!-- Controle de Tempo -->
         <div class="form-group">
           <label class="form-label">Controle de Tempo (Relógio)</label>
           <select id="select-clock-type" class="form-select">
@@ -438,56 +474,56 @@
     </div>
   </div>
 
-  <!-- Modal: Fim de Jogo & Pontuação Interativa -->
-  <div class="modal-backdrop" id="modal-scoring">
+  <!-- Modal 3.2: Fim de Jogo & Pontuação Interativa -->
+  <div class="modal-backdrop" id="modal-scoring" role="dialog" aria-modal="true">
     <div class="modal-window" style="max-width: 560px;">
       <div class="modal-header">
         <h3><span>🏆</span> Resultado e Contagem de Pontos</h3>
-        <button class="btn-icon modal-close-btn" id="modal-scoring-close">✕</button>
+        <button class="btn-icon modal-close-btn" id="modal-scoring-close" aria-label="Fechar modal">✕</button>
       </div>
       <div class="modal-body">
-        <div style="text-align: center; margin-bottom: 20px;">
-          <h2 id="scoring-winner-title" style="font-size: 24px; color: var(--accent-gold); margin-bottom: 6px;">Vitória das Pretas!</h2>
-          <p id="scoring-winner-desc" style="color: var(--text-secondary); font-size: 14px;">Vitória por 8.5 pontos</p>
+        <div class="scoring-hero">
+          <h2 id="scoring-winner-title" class="scoring-winner-title">Vitória das Pretas!</h2>
+          <p id="scoring-winner-desc" class="scoring-winner-desc">Vitória por 8.5 pontos</p>
         </div>
 
-        <div style="background: rgba(0,0,0,0.3); border-radius: var(--radius-lg); padding: 16px; border: 1px solid var(--border-color); margin-bottom: 16px;">
-          <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
+        <div class="scoring-table-card">
+          <table class="scoring-table">
             <thead>
-              <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-muted); text-align: left;">
-                <th style="padding: 8px;">Categoria</th>
-                <th style="padding: 8px; text-align: center;">⚫ Pretas</th>
-                <th style="padding: 8px; text-align: center;">⚪ Brancas</th>
+              <tr>
+                <th>Categoria</th>
+                <th class="center">⚫ Pretas</th>
+                <th class="center">⚪ Brancas</th>
               </tr>
             </thead>
             <tbody>
-              <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
-                <td style="padding: 8px;">Território Cercado</td>
-                <td style="padding: 8px; text-align: center;" id="score-black-territory">0</td>
-                <td style="padding: 8px; text-align: center;" id="score-white-territory">0</td>
+              <tr>
+                <td>Território Cercado</td>
+                <td class="center" id="score-black-territory">0</td>
+                <td class="center" id="score-white-territory">0</td>
               </tr>
-              <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
-                <td style="padding: 8px;">Prisioneiros Capturados</td>
-                <td style="padding: 8px; text-align: center;" id="score-black-captures">0</td>
-                <td style="padding: 8px; text-align: center;" id="score-white-captures">0</td>
+              <tr>
+                <td>Prisioneiros Capturados</td>
+                <td class="center" id="score-black-captures">0</td>
+                <td class="center" id="score-white-captures">0</td>
               </tr>
-              <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
-                <td style="padding: 8px;">Komi (Compensação)</td>
-                <td style="padding: 8px; text-align: center;">0.0</td>
-                <td style="padding: 8px; text-align: center;" id="score-komi-val">6.5</td>
+              <tr>
+                <td>Komi (Compensação)</td>
+                <td class="center">0.0</td>
+                <td class="center" id="score-komi-val">6.5</td>
               </tr>
-              <tr style="font-weight: 700; font-size: 15px; color: var(--accent-gold);">
-                <td style="padding: 10px 8px;">TOTAL</td>
-                <td style="padding: 10px 8px; text-align: center;" id="score-black-total">0.0</td>
-                <td style="padding: 10px 8px; text-align: center;" id="score-white-total">6.5</td>
+              <tr class="scoring-total-row">
+                <td>TOTAL</td>
+                <td class="center" id="score-black-total">0.0</td>
+                <td class="center" id="score-white-total">6.5</td>
               </tr>
             </tbody>
           </table>
         </div>
 
-        <p style="font-size: 12px; color: var(--text-muted); line-height: 1.4; margin-bottom: 12px;">
+        <div class="scoring-tip">
           💡 <em>Dica: No tabuleiro, você pode clicar sobre grupos de pedras para marcá-los como mortos ou vivos e atualizar a contagem dinamicamente.</em>
-        </p>
+        </div>
 
         <button class="btn btn-primary" id="btn-modal-start-review" style="width: 100%;">
           <span>📊 Iniciar Análise Pós-Jogo Completa (Game Review)</span>
@@ -500,14 +536,14 @@
     </div>
   </div>
 
-  <!-- Modal: Barra de Progresso da Análise Pós-Jogo -->
-  <div class="modal-backdrop" id="modal-review-progress">
+  <!-- Modal 3.3: Barra de Progresso da Análise com IA -->
+  <div class="modal-backdrop" id="modal-review-progress" role="dialog" aria-modal="true">
     <div class="modal-window" style="max-width: 440px;">
       <div class="modal-header">
         <h3><span>🧠</span> Analisando Partida com IA</h3>
       </div>
       <div class="modal-body" style="text-align: center;">
-        <p style="color: var(--text-secondary); font-size: 14px; margin-bottom: 16px;">
+        <p class="modal-desc">
           Calculando probabilidades de vitória, melhores alternativas e identificando jogadas brilhantes e erros...
         </p>
         <div style="background: rgba(0,0,0,0.4); height: 12px; border-radius: 6px; overflow: hidden; border: 1px solid var(--border-color); margin-bottom: 12px;">
@@ -523,41 +559,41 @@
     </div>
   </div>
 
-  <!-- Modal: Lista de Tsumego e Joseki -->
-  <div class="modal-backdrop" id="modal-study-list">
+  <!-- Modal 3.4: Lista de Problemas Tsumego e Joseki -->
+  <div class="modal-backdrop" id="modal-study-list" role="dialog" aria-modal="true">
     <div class="modal-window" style="max-width: 600px;">
       <div class="modal-header">
         <h3 id="modal-study-header"><span>🧩</span> Problemas de Tsumego</h3>
-        <button class="btn-icon modal-close-btn" id="modal-study-close">✕</button>
+        <button class="btn-icon modal-close-btn" id="modal-study-close" aria-label="Fechar modal">✕</button>
       </div>
       <div class="modal-body" id="modal-study-content"></div>
     </div>
   </div>
 
-  <!-- Modal: Guia Completo de Regras de Go -->
-  <div class="modal-backdrop" id="modal-rules-guide">
+  <!-- Modal 3.5: Guia Completo de Regras de Go -->
+  <div class="modal-backdrop" id="modal-rules-guide" role="dialog" aria-modal="true">
     <div class="modal-window" style="max-width: 680px;">
       <div class="modal-header">
         <h3><span>📖</span> Como Jogar Go (Weiqi / Baduk) - Guia Completo</h3>
-        <button class="btn-icon modal-close-btn" id="modal-rules-close">✕</button>
+        <button class="btn-icon modal-close-btn" id="modal-rules-close" aria-label="Fechar modal">✕</button>
       </div>
-      <div class="modal-body" style="font-size: 14px; line-height: 1.6; color: var(--text-secondary);">
-        <h4 style="color: var(--text-primary); margin: 12px 0 6px 0;">1. O Objetivo do Jogo</h4>
+      <div class="modal-body rules-guide-content">
+        <h4>1. O Objetivo do Jogo</h4>
         <p>O Go é um jogo de estratégia territorial milenar originado na China. O objetivo principal é cercar mais território livre no tabuleiro do que o adversário.</p>
 
-        <h4 style="color: var(--text-primary); margin: 16px 0 6px 0;">2. As Liberdades e Captura</h4>
+        <h4>2. As Liberdades e Captura</h4>
         <p>Cada pedra colocada possui conexões ortogonais chamadas <strong>Liberdades</strong> (pontos vazios adjacentes). Quando todas as liberdades de uma pedra ou grupo conectado são preenchidas pelo oponente, o grupo é imediatamente capturado e removido do tabuleiro.</p>
 
-        <h4 style="color: var(--text-primary); margin: 16px 0 6px 0;">3. Proibição do Suicídio</h4>
+        <h4>3. Proibição do Suicídio</h4>
         <p>Não é permitido fazer uma jogada que resulte em 0 liberdades para o próprio grupo, a menos que essa jogada capture imediatamente pedras do adversário.</p>
 
-        <h4 style="color: var(--text-primary); margin: 16px 0 6px 0;">4. A Regra do Ko (Repetição)</h4>
+        <h4>4. A Regra do Ko (Repetição)</h4>
         <p>É proibido fazer uma jogada que recrie a mesma posição exata do tabuleiro imediatamente anterior (regra do Ko). O jogador deve jogar em outro lugar primeiro para depois recapturar.</p>
 
-        <h4 style="color: var(--text-primary); margin: 16px 0 6px 0;">5. Dois Olhos e Vida Incondicional</h4>
+        <h4>5. Dois Olhos e Vida Incondicional</h4>
         <p>Um grupo com dois ou mais espaços internos separados (olhos) é imortal, pois o oponente nunca poderá capturá-lo sem cometer suicídio proibido.</p>
 
-        <h4 style="color: var(--text-primary); margin: 16px 0 6px 0;">6. Fim do Jogo e Pontuação</h4>
+        <h4>6. Fim do Jogo e Pontuação</h4>
         <p>Quando ambos os jogadores passam consecutivamente, o jogo termina. Os pontos são calculados com base no território cercado + prisioneiros capturados + Komi (compensação para as Brancas por jogarem em segundo lugar, normalmente 6.5 pontos).</p>
       </div>
       <div class="modal-footer">
@@ -566,30 +602,30 @@
     </div>
   </div>
 
-  <!-- Modal: Biblioteca de Partidas (Pasta Revisão) -->
-  <div class="modal-backdrop" id="modal-review-library">
+  <!-- Modal 3.6: Biblioteca de Partidas (Pasta Revisão) -->
+  <div class="modal-backdrop" id="modal-review-library" role="dialog" aria-modal="true">
     <div class="modal-window" style="max-width: 680px;">
       <div class="modal-header">
         <h3><span>📁</span> Biblioteca de Partidas - Pasta Revisão</h3>
-        <button class="btn-icon modal-close-btn" id="modal-review-library-close">✕</button>
+        <button class="btn-icon modal-close-btn" id="modal-review-library-close" aria-label="Fechar modal">✕</button>
       </div>
       <div class="modal-body">
-        <p style="color: var(--text-secondary); font-size: 13px; margin-bottom: 16px;">
+        <p class="modal-desc">
           Selecione uma partida salva na pasta <strong>Revisão</strong> para abrir no tabuleiro ou realizar uma análise completa com a IA:
         </p>
 
         <div id="review-library-list" style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;">
-          <!-- Preset games will be dynamically injected here -->
+          <!-- Partidas pré-gravadas são injetadas dinamicamente aqui -->
         </div>
 
-        <div style="background: rgba(0,0,0,0.3); border: 1px dashed var(--border-color); border-radius: var(--radius-md); padding: 16px; text-align: center;">
-          <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 6px;">
+        <div class="library-upload-box">
+          <div class="library-upload-title">
             Quer analisar outro jogo?
           </div>
-          <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">
+          <p class="library-upload-desc">
             Carregue qualquer arquivo .sgf do seu computador ou cole o código SGF diretamente.
           </p>
-          <div style="display: flex; gap: 8px; justify-content: center;">
+          <div class="library-upload-actions">
             <button id="btn-library-upload-trigger" class="btn btn-secondary btn-sm">
               <span>📂 Carregar Arquivo SGF</span>
             </button>
@@ -602,15 +638,15 @@
     </div>
   </div>
 
-  <!-- Modal: Glossario de conceitos -->
-  <div class="modal-backdrop" id="modal-glossary">
+  <!-- Modal 3.7: Glossário de Conceitos do Go -->
+  <div class="modal-backdrop" id="modal-glossary" role="dialog" aria-modal="true">
     <div class="modal-window" style="max-width: 720px;">
       <div class="modal-header">
         <h3><span>📚</span> Glossário: os conceitos do Go</h3>
-        <button class="btn-icon modal-close-btn" id="modal-glossary-close">✕</button>
+        <button class="btn-icon modal-close-btn" id="modal-glossary-close" aria-label="Fechar modal">✕</button>
       </div>
       <div class="modal-body">
-        <p style="color: var(--text-secondary); font-size: 13px; margin-bottom: 16px;">
+        <p class="modal-desc">
           Cada observação da revisão aponta para um destes conceitos. Se você nunca jogou Go,
           comece por <strong>Liberdade</strong> e <strong>Atari</strong> — são a base de tudo.
         </p>
@@ -622,18 +658,18 @@
     </div>
   </div>
 
-  <!-- Modal: Colar Texto SGF -->
-  <div class="modal-backdrop" id="modal-paste-sgf">
+  <!-- Modal 3.8: Colar Texto SGF -->
+  <div class="modal-backdrop" id="modal-paste-sgf" role="dialog" aria-modal="true">
     <div class="modal-window" style="max-width: 580px;">
       <div class="modal-header">
         <h3><span>📋</span> Colar Código SGF</h3>
-        <button class="btn-icon modal-close-btn" id="modal-paste-sgf-close">✕</button>
+        <button class="btn-icon modal-close-btn" id="modal-paste-sgf-close" aria-label="Fechar modal">✕</button>
       </div>
       <div class="modal-body">
-        <p style="color: var(--text-secondary); font-size: 13px; margin-bottom: 10px;">
+        <p class="modal-desc">
           Cole abaixo o conteúdo do arquivo SGF da sua partida (ex: exportado do OGS, Fox, KGS, etc.):
         </p>
-        <textarea id="paste-sgf-textarea" placeholder="(;GM[1]FF[4]SZ[9]...)" style="width: 100%; height: 160px; background: rgba(0,0,0,0.4); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary); font-family: var(--font-mono); font-size: 12px; padding: 10px; resize: vertical; margin-bottom: 12px; outline: none;"></textarea>
+        <textarea id="paste-sgf-textarea" placeholder="(;GM[1]FF[4]SZ[9]...)" class="modal-textarea" style="height: 160px;"></textarea>
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" id="btn-cancel-paste-sgf">Cancelar</button>
@@ -642,18 +678,18 @@
     </div>
   </div>
 
-  <!-- Modal: Resumo em Texto Puro do Sensei -->
-  <div class="modal-backdrop" id="modal-text-summary">
+  <!-- Modal 3.9: Resumo em Texto Puro do Sensei -->
+  <div class="modal-backdrop" id="modal-text-summary" role="dialog" aria-modal="true">
     <div class="modal-window" style="max-width: 680px;">
       <div class="modal-header">
         <h3><span>🥋</span> Relatório Textual do Sensei</h3>
-        <button class="btn-icon modal-close-btn" id="modal-text-summary-close">✕</button>
+        <button class="btn-icon modal-close-btn" id="modal-text-summary-close" aria-label="Fechar modal">✕</button>
       </div>
       <div class="modal-body">
-        <p style="color: var(--text-secondary); font-size: 13px; margin-bottom: 12px;">
+        <p class="modal-desc">
           Diagnóstico completo da partida formatado em texto puro:
         </p>
-        <textarea id="plain-text-summary-area" readonly class="plain-text-summary-area" style="width: 100%; height: 320px; background: rgba(0,0,0,0.45); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary); font-family: var(--font-mono); font-size: 11.5px; line-height: 1.5; padding: 12px; resize: vertical; margin-bottom: 12px; outline: none;"></textarea>
+        <textarea id="plain-text-summary-area" readonly class="modal-textarea plain-text-summary-area" style="height: 320px; font-size: 11.5px; line-height: 1.5;"></textarea>
       </div>
       <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
         <button class="btn btn-primary" id="btn-modal-copy-plain-text">
@@ -664,7 +700,7 @@
     </div>
   </div>
 
-  <!-- App Entry Script -->
+  <!-- Script Principal da Aplicação -->
   <script type="module" src="/src/ui/App.ts"></script>
 </body>
 </html>

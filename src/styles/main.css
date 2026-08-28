@@ -1605,3 +1605,171 @@ canvas#go-board {
   background: rgba(16, 185, 129, 0.08);
   border-radius: var(--radius-sm);
 }
+
+/* --- Scoring Table & Modal Classes --- */
+.scoring-hero {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.scoring-winner-title {
+  font-size: 24px;
+  color: var(--accent-gold);
+  margin-bottom: 6px;
+  font-weight: 700;
+}
+
+.scoring-winner-desc {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.scoring-table-card {
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  border: 1px solid var(--border-color);
+  margin-bottom: 16px;
+}
+
+.scoring-table {
+  width: 100%;
+  font-size: 13px;
+  border-collapse: collapse;
+}
+
+.scoring-table th {
+  padding: 8px;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-muted);
+}
+
+.scoring-table th.center,
+.scoring-table td.center {
+  text-align: center;
+}
+
+.scoring-table td {
+  padding: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.scoring-table tr.scoring-total-row td {
+  padding: 10px 8px;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--accent-gold);
+  border-bottom: none;
+}
+
+.scoring-tip {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+  margin-bottom: 14px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: var(--radius-sm);
+  border-left: 2px solid var(--accent-gold);
+}
+
+/* --- Territorial Estimation Widget --- */
+.territory-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.territory-box {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+}
+
+.territory-box-label {
+  color: var(--text-muted);
+  font-size: 11px;
+  margin-bottom: 2px;
+}
+
+.territory-box-value {
+  font-weight: 700;
+  font-size: 16px;
+  font-family: var(--font-mono);
+}
+
+/* --- Library Upload Box --- */
+.library-upload-box {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  text-align: center;
+  margin-top: 16px;
+}
+
+.library-upload-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+
+.library-upload-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.library-upload-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* --- Generic Modal Elements --- */
+.modal-desc {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+  margin-bottom: 14px;
+}
+
+.modal-textarea {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 10px;
+  resize: vertical;
+  margin-bottom: 12px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.modal-textarea:focus {
+  border-color: var(--border-focus);
+}
+
+.rules-guide-content h4 {
+  color: var(--accent-gold);
+  margin: 16px 0 6px 0;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rules-guide-content p {
+  color: var(--text-secondary);
+  font-size: 13.5px;
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+
