@@ -111,6 +111,34 @@
         <!-- Move Breakdown Table -->
         <div class="review-stats-table" id="review-stats-breakdown"></div>
 
+        <!-- Resumo Textual do Sensei (Diagnóstico em Linguagem Natural) -->
+        <div class="sensei-summary-block">
+          <div class="sensei-summary-header">
+            <div class="sensei-title-wrap">
+              <span class="sensei-icon">🥋</span>
+              <span class="sensei-heading">Resumo do Sensei</span>
+            </div>
+            <div class="sensei-header-actions">
+              <button class="btn btn-secondary btn-xs" id="btn-copy-review-text" title="Copiar resumo em texto">
+                <span id="copy-btn-icon">📋</span> <span id="copy-btn-text">Copiar</span>
+              </button>
+              <button class="btn btn-secondary btn-xs" id="btn-view-full-text-modal" title="Abrir texto completo">
+                <span>📖 Texto</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Switcher: Geral | Pretas | Brancas -->
+          <div class="sensei-tabs" id="sensei-summary-tabs">
+            <button type="button" class="sensei-tab-btn active" data-tab="general">Geral</button>
+            <button type="button" class="sensei-tab-btn" data-tab="black">⚫ Pretas</button>
+            <button type="button" class="sensei-tab-btn" data-tab="white">⚪ Brancas</button>
+          </div>
+
+          <!-- Tab Content Container -->
+          <div id="sensei-tab-content" class="sensei-content-area"></div>
+        </div>
+
         <!-- O que estudar depois desta partida -->
         <div class="study-plan-block">
           <div class="study-plan-header">
@@ -610,6 +638,28 @@
       <div class="modal-footer">
         <button class="btn btn-secondary" id="btn-cancel-paste-sgf">Cancelar</button>
         <button class="btn btn-primary" id="btn-submit-paste-sgf">Carregar & Analisar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Resumo em Texto Puro do Sensei -->
+  <div class="modal-backdrop" id="modal-text-summary">
+    <div class="modal-window" style="max-width: 680px;">
+      <div class="modal-header">
+        <h3><span>🥋</span> Relatório Textual do Sensei</h3>
+        <button class="btn-icon modal-close-btn" id="modal-text-summary-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="color: var(--text-secondary); font-size: 13px; margin-bottom: 12px;">
+          Diagnóstico completo da partida formatado em texto puro:
+        </p>
+        <textarea id="plain-text-summary-area" readonly class="plain-text-summary-area" style="width: 100%; height: 320px; background: rgba(0,0,0,0.45); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary); font-family: var(--font-mono); font-size: 11.5px; line-height: 1.5; padding: 12px; resize: vertical; margin-bottom: 12px; outline: none;"></textarea>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+        <button class="btn btn-primary" id="btn-modal-copy-plain-text">
+          <span id="modal-copy-icon">📋</span> <span id="modal-copy-text">Copiar Texto Completo</span>
+        </button>
+        <button class="btn btn-secondary modal-close-btn" id="btn-close-modal-text-summary">Fechar</button>
       </div>
     </div>
   </div>

@@ -14,6 +14,7 @@ import { BotManager } from './BotManager';
 import { BotResponse } from './GoBotWorker';
 import { MoveInsights, MoveInsight } from './MoveInsights';
 import { ConceptId } from '../data/concepts';
+import { ReviewSummaryGenerator } from './ReviewSummary';
 
 export interface ReviewOptions {
   /** Thinking time per analysed position. */
@@ -405,17 +406,33 @@ export class GameReviewer {
       return Math.round(sum / colEvals.length);
     };
 
-    return {
+    const blackAccuracyPct = calcAccuracy('black');
+    const whiteAccuracyPct = calcAccuracy('white');
+    const studyPlan = {
+      black: this.buildStudyPlan(evaluations, 'black'),
+      white: this.buildStudyPlan(evaluations, 'white')
+    };
+
+    const textSummary = ReviewSummaryGenerator.generate({
+      size: initialSize,
       totalMoves: evaluations.length,
-      blackAccuracyPct: calcAccuracy('black'),
-      whiteAccuracyPct: calcAccuracy('white'),
+      blackAccuracyPct,
+      whiteAccuracyPct,
       evaluations,
       stats,
       turningPoints,
-      studyPlan: {
-        black: this.buildStudyPlan(evaluations, 'black'),
-        white: this.buildStudyPlan(evaluations, 'white')
-      }
+      studyPlan
+    });
+
+    return {
+      totalMoves: evaluations.length,
+      blackAccuracyPct,
+      whiteAccuracyPct,
+      evaluations,
+      stats,
+      turningPoints,
+      studyPlan,
+      textSummary
     };
   }
 }

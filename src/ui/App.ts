@@ -11,6 +11,7 @@ import {
   MoveEvaluation,
   Point,
   RuleSet,
+  SummaryPointItem,
   TerritoryScore,
   TsumegoNode,
   TsumegoProblem
@@ -129,6 +130,7 @@ export class App {
   private reviewSource: ReviewSource | null = null;
   private currentReviewMoveIndex = 0;
   private activeAlternative: AlternativeMove | null = null;
+  private activeSenseiTab: 'general' | 'black' | 'white' = 'general';
   private reviewCancelled = false;
 
   // Variation sandbox and blunder challenge
@@ -444,6 +446,24 @@ export class App {
     document.getElementById('btn-open-glossary')?.addEventListener('click', () => this.openGlossary());
     document.getElementById('btn-close-glossary')?.addEventListener('click', () => this.closeModal('modal-glossary'));
     document.getElementById('btn-review-challenge')?.addEventListener('click', () => this.startBlunderChallenge());
+
+    // Sensei text summary controls
+    document.getElementById('btn-copy-review-text')?.addEventListener('click', () => void this.copyReviewTextSummary());
+    document.getElementById('btn-view-full-text-modal')?.addEventListener('click', () => this.openTextSummaryModal());
+    document.getElementById('modal-text-summary-close')?.addEventListener('click', () => this.closeModal('modal-text-summary'));
+    document.getElementById('btn-close-modal-text-summary')?.addEventListener('click', () => this.closeModal('modal-text-summary'));
+    document.getElementById('btn-modal-copy-plain-text')?.addEventListener('click', () => void this.copyModalPlainText());
+
+    // Sensei tab buttons
+    document.querySelectorAll('#sensei-summary-tabs .sensei-tab-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const tab = (e.currentTarget as HTMLElement).getAttribute('data-tab') as 'general' | 'black' | 'white' | null;
+        if (tab) {
+          this.activeSenseiTab = tab;
+          this.renderSenseiSummary();
+        }
+      });
+    });
 
     // Replay transport
     document.getElementById('btn-replay-start')?.addEventListener('click', () => this.jumpReplay(0));
@@ -1044,6 +1064,7 @@ export class App {
       this.isChallengeMode = false;
       this.setReviewModeUI(true);
       this.populateReviewStats();
+      this.renderSenseiSummary();
       this.renderStudyPlan();
       this.selectReviewMove(0);
     } catch (err) {
@@ -1455,6 +1476,183 @@ export class App {
     }
 
     container.appendChild(fragment);
+  }
+
+  /** Renders the AI Sensei text summary (strengths, weaknesses, recommendations). */
+  private renderSenseiSummary(): void {
+    const container = document.getElementById('sensei-tab-content');
+    const report = this.reviewReport;
+    if (!container || !report || !report.textSummary) return;
+    container.textContent = '';
+
+    const summary = report.textSummary;
+    const tab = this.activeSenseiTab;
+
+    // Update active tab buttons
+    document.querySelectorAll('#sensei-summary-tabs .sensei-tab-btn').forEach(btn => {
+      const btnTab = btn.getAttribute('data-tab');
+      btn.classList.toggle('active', btnTab === tab);
+    });
+
+    const fragment = document.createDocumentFragment();
+
+    if (tab === 'general') {
+      const narrCard = document.createElement('div');
+      narrCard.className = 'sensei-narrative-card';
+      narrCard.textContent = summary.narrative;
+      fragment.appendChild(narrCard);
+
+      const blackHead = document.createElement('div');
+      blackHead.className = 'sensei-headline';
+      blackHead.style.borderLeftColor = '#a855f7';
+      blackHead.textContent = `⚫ Pretas: ${summary.black.headline}`;
+      fragment.appendChild(blackHead);
+
+      const whiteHead = document.createElement('div');
+      whiteHead.className = 'sensei-headline';
+      whiteHead.style.borderLeftColor = '#f59e0b';
+      whiteHead.textContent = `⚪ Brancas: ${summary.white.headline}`;
+      fragment.appendChild(whiteHead);
+    } else {
+      const playerSummary = tab === 'black' ? summary.black : summary.white;
+
+      const headline = document.createElement('div');
+      headline.className = 'sensei-headline';
+      headline.textContent = playerSummary.headline;
+      fragment.appendChild(headline);
+
+      // Strengths
+      const strengthsTitle = document.createElement('div');
+      strengthsTitle.className = 'sensei-section-title title-strengths';
+      strengthsTitle.textContent = '🌟 O que fez de bom (Pontos Fortes)';
+      fragment.appendChild(strengthsTitle);
+
+      const strengthsList = document.createElement('div');
+      strengthsList.className = 'sensei-items-list';
+      for (const item of playerSummary.strengths) {
+        strengthsList.appendChild(this.buildSenseiItemElement(item));
+      }
+      fragment.appendChild(strengthsList);
+
+      // Weaknesses
+      const weaknessesTitle = document.createElement('div');
+      weaknessesTitle.className = 'sensei-section-title title-weaknesses';
+      weaknessesTitle.textContent = '⚠️ O que tem que melhorar (Pontos Fracos)';
+      fragment.appendChild(weaknessesTitle);
+
+      const weaknessesList = document.createElement('div');
+      weaknessesList.className = 'sensei-items-list';
+      for (const item of playerSummary.weaknesses) {
+        weaknessesList.appendChild(this.buildSenseiItemElement(item));
+      }
+      fragment.appendChild(weaknessesList);
+
+      // Recommendations
+      const recsTitle = document.createElement('div');
+      recsTitle.className = 'sensei-section-title title-recommendations';
+      recsTitle.textContent = '💡 Conselhos & Dicas do Sensei';
+      fragment.appendChild(recsTitle);
+
+      const recsList = document.createElement('div');
+      recsList.className = 'sensei-items-list';
+      for (const item of playerSummary.recommendations) {
+        recsList.appendChild(this.buildSenseiItemElement(item));
+      }
+      fragment.appendChild(recsList);
+    }
+
+    container.appendChild(fragment);
+  }
+
+  private buildSenseiItemElement(item: SummaryPointItem): HTMLElement {
+    const el = document.createElement('div');
+    el.className = `sensei-item item-${item.severity ?? 'info'}`;
+
+    const head = document.createElement('div');
+    head.className = 'sensei-item-head';
+
+    const titleSpan = document.createElement('span');
+    titleSpan.textContent = item.title;
+    head.appendChild(titleSpan);
+
+    if (item.moveNumbers && item.moveNumbers.length > 0) {
+      const movesWrap = document.createElement('span');
+      movesWrap.style.display = 'inline-flex';
+      movesWrap.style.gap = '3px';
+      movesWrap.style.flexWrap = 'wrap';
+
+      for (const mNum of item.moveNumbers.slice(0, 4)) {
+        const link = document.createElement('button');
+        link.type = 'button';
+        link.className = 'sensei-move-link';
+        link.textContent = `L.${mNum}`;
+        link.title = `Ir para o lance ${mNum}`;
+        link.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const report = this.reviewReport;
+          if (!report) return;
+          const idx = report.evaluations.findIndex(ev => ev.moveNumber === mNum);
+          if (idx >= 0) this.selectReviewMove(idx);
+        });
+        movesWrap.appendChild(link);
+      }
+      head.appendChild(movesWrap);
+    }
+
+    const detail = document.createElement('div');
+    detail.className = 'sensei-item-detail';
+    detail.textContent = item.detail;
+
+    el.append(head, detail);
+    return el;
+  }
+
+  private openTextSummaryModal(): void {
+    const report = this.reviewReport;
+    if (!report || !report.textSummary) return;
+
+    const textarea = document.getElementById('plain-text-summary-area') as HTMLTextAreaElement | null;
+    if (textarea) {
+      textarea.value = report.textSummary.plainText;
+    }
+    this.openModal('modal-text-summary');
+  }
+
+  private async copyReviewTextSummary(): Promise<void> {
+    const report = this.reviewReport;
+    if (!report || !report.textSummary) return;
+
+    try {
+      await navigator.clipboard.writeText(report.textSummary.plainText);
+      const textSpan = document.getElementById('copy-btn-text');
+      const iconSpan = document.getElementById('copy-btn-icon');
+      if (textSpan) textSpan.textContent = 'Copiado!';
+      if (iconSpan) iconSpan.textContent = '✅';
+      setTimeout(() => {
+        if (textSpan) textSpan.textContent = 'Copiar';
+        if (iconSpan) iconSpan.textContent = '📋';
+      }, 2000);
+    } catch {
+      this.openTextSummaryModal();
+    }
+  }
+
+  private async copyModalPlainText(): Promise<void> {
+    const textarea = document.getElementById('plain-text-summary-area') as HTMLTextAreaElement | null;
+    if (!textarea) return;
+    try {
+      await navigator.clipboard.writeText(textarea.value);
+      const modalCopyText = document.getElementById('modal-copy-text');
+      const modalCopyIcon = document.getElementById('modal-copy-icon');
+      if (modalCopyText) modalCopyText.textContent = 'Copiado com Sucesso!';
+      if (modalCopyIcon) modalCopyIcon.textContent = '✅';
+      setTimeout(() => {
+        if (modalCopyText) modalCopyText.textContent = 'Copiar Texto Completo';
+        if (modalCopyIcon) modalCopyIcon.textContent = '📋';
+      }, 2000);
+    } catch {
+      textarea.select();
+    }
   }
 
   /** Opens the glossary, optionally scrolled to one concept. */

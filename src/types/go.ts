@@ -116,6 +116,27 @@ export interface MoveEvaluation {
   pointsLost: number;
 }
 
+export interface SummaryPointItem {
+  title: string;
+  detail: string;
+  moveNumbers?: number[];
+  severity?: 'good' | 'warning' | 'critical' | 'info';
+}
+
+export interface PlayerTextSummary {
+  headline: string;
+  strengths: SummaryPointItem[];
+  weaknesses: SummaryPointItem[];
+  recommendations: SummaryPointItem[];
+}
+
+export interface GameTextSummary {
+  narrative: string;
+  black: PlayerTextSummary;
+  white: PlayerTextSummary;
+  plainText: string;
+}
+
 export interface GameReviewReport {
   totalMoves: number;
   blackAccuracyPct: number;
@@ -128,4 +149,7 @@ export interface GameReviewReport {
   turningPoints: { moveNumber: number; description: string; impact: string }[];
   /** What each player should study, most frequent problem first. */
   studyPlan: { black: StudyTopic[]; white: StudyTopic[] };
+  /** Complete plain-language executive summary of the match. */
+  textSummary: GameTextSummary;
 }
+
