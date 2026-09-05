@@ -1,0 +1,20 @@
+# Lido por Netlify e Cloudflare Pages.
+#
+# A página é um arquivo único: quando você publica uma versão nova, o navegador
+# precisa perceber na hora. `no-cache` não desliga o cache — manda revalidar,
+# então uma página que não mudou continua vindo do disco (304, sem download).
+/index.html
+  Cache-Control: public, no-cache
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+
+/
+  Cache-Control: public, no-cache
+
+# Ícones e manifesto raramente mudam e não têm hash no nome, então uma semana
+# com revalidação em segundo plano é o equilíbrio seguro.
+/manifest.webmanifest
+  Cache-Control: public, max-age=604800
+
+/*.png
+  Cache-Control: public, max-age=604800

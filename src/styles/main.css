@@ -1,9 +1,11 @@
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+/* Fontes do sistema: nenhuma requisicao externa. O jogo carrega e desenha o
+   primeiro quadro sem esperar por fonts.googleapis.com — o que no celular
+   custava duas viagens de rede e ~150 KB antes de qualquer pixel aparecer. */
 
 :root {
-  --font-main: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-serif: 'Cinzel', serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  --font-main: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+  --font-serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, 'Times New Roman', serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', 'Cascadia Mono', Consolas, 'Roboto Mono', monospace;
 
   /* Palette - Luxury Zen Dark */
   --bg-main: #0c0e14;
@@ -36,6 +38,12 @@
   --radius-md: 10px;
   --radius-lg: 16px;
   --radius-xl: 24px;
+
+  /* Altura real do cabecalho. O layout e o dimensionamento do tabuleiro leem
+     este valor, entao mudar a barra em um breakpoint nao desalinha o resto. */
+  --header-h: 64px;
+  /* Respiro para os cantos arredondados / barra inferior do iOS. */
+  --safe-b: env(safe-area-inset-bottom, 0px);
 }
 
 * {
@@ -50,6 +58,9 @@ body {
   background-color: var(--bg-main);
   color: var(--text-primary);
   min-height: 100vh;
+  min-height: 100dvh;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior-y: contain;
   display: flex;
   flex-direction: column;
   overflow-x: hidden;
@@ -60,7 +71,7 @@ body {
 
 /* Header & Top Bar */
 .app-header {
-  height: 64px;
+  height: var(--header-h);
   padding: 0 24px;
   background: rgba(18, 21, 30, 0.85);
   backdrop-filter: blur(12px);
@@ -157,6 +168,11 @@ body {
   gap: 10px;
 }
 
+/* Rotulo curto de botao: so aparece quando o breakpoint estreito o pede. */
+.btn-label-short {
+  display: none;
+}
+
 /* Primary Container & Layout */
 .main-layout {
   display: flex;
@@ -166,7 +182,8 @@ body {
   max-width: 1800px;
   margin: 0 auto;
   width: 100%;
-  height: calc(100vh - 64px);
+  height: calc(100vh - var(--header-h));
+  height: calc(100dvh - var(--header-h));
   overflow: hidden;
 }
 
@@ -200,6 +217,7 @@ body {
 canvas#go-board {
   display: block;
   cursor: crosshair;
+  max-width: 100%;
 }
 
 /* Floating In-Board Controls (Quick Bar) */
@@ -260,6 +278,11 @@ canvas#go-board {
 }
 
 /* Player Cards */
+#live-player-cards {
+  display: flex;
+  flex-direction: column;
+}
+
 .player-card {
   display: flex;
   align-items: center;
@@ -304,6 +327,7 @@ canvas#go-board {
 .player-name-wrap {
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .player-name {
@@ -1083,16 +1107,6 @@ canvas#winrate-chart {
   to { opacity: 1; transform: scale(1); }
 }
 
-@media (max-width: 1200px) {
-  .main-layout {
-    flex-direction: column;
-    align-items: center;
-  }
-  .sidebar-panel {
-    width: 100%;
-    max-width: 650px;
-  }
-}
 
 
 /* ============================================================
@@ -1161,35 +1175,7 @@ canvas#go-board {
   }
 }
 
-@media (max-width: 900px) {
-  .app-header {
-    flex-wrap: wrap;
-    height: auto;
-    gap: 8px;
-    padding: 8px 12px;
-  }
-  .nav-tabs {
-    order: 3;
-    width: 100%;
-    overflow-x: auto;
-  }
-  .main-layout {
-    height: auto;
-    padding: 8px;
-  }
-  .board-quick-controls {
-    flex-wrap: wrap;
-  }
-}
 
-@media (max-width: 560px) {
-  .logo-tag {
-    display: none;
-  }
-  .sidebar-panel {
-    max-width: 100%;
-  }
-}
 
 /* ============================================================
    REVISÃO DIDÁTICA: observações, conceitos e plano de estudo
@@ -1773,3 +1759,392 @@ canvas#go-board {
   margin-bottom: 12px;
 }
 
+
+/* ============================================================
+   BARRA DE CONFIRMACAO POR TOQUE E ALTERNADOR DE PAINEIS
+   Ambos existem so em telas sensiveis ao toque / estreitas;
+   o desktop nunca os ve.
+   ============================================================ */
+
+.touch-confirm-bar {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 6px 10px;
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-focus);
+  box-shadow: var(--shadow-lg);
+}
+
+.touch-confirm-bar[hidden] {
+  display: none !important;
+}
+
+.touch-confirm-coord {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--accent-gold);
+  min-width: 46px;
+  text-align: center;
+}
+
+.panel-switch {
+  display: none;
+  gap: 6px;
+  padding: 4px;
+  border-radius: var(--radius-lg);
+  background: rgba(12, 14, 20, 0.85);
+  border: 1px solid var(--border-color);
+}
+
+.panel-switch-btn {
+  flex: 1;
+  padding: 9px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.panel-switch-btn.active {
+  background: var(--accent-gold-subtle);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: var(--accent-gold);
+}
+
+/* ============================================================
+   RESPONSIVO
+   Ordem importa: este bloco fica no fim do arquivo para vencer
+   as regras de desktop sem precisar de !important.
+   ============================================================ */
+
+/* --- Tablet e telas medias: as colunas laterais empilham --------- */
+@media (max-width: 1200px) {
+  .main-layout {
+    flex-direction: column;
+    align-items: center;
+    height: auto;
+    overflow: visible;
+  }
+
+  .sidebar-panel {
+    width: 100%;
+    max-width: 720px;
+    max-height: none;
+    overflow-y: visible;
+  }
+
+  .board-container-wrapper {
+    width: 100%;
+    height: auto;
+  }
+}
+
+/* --- Celular: tabuleiro primeiro, paineis em abas ---------------- */
+@media (max-width: 900px) {
+  :root {
+    --header-h: 92px;
+  }
+
+  /* O cabecalho vira duas faixas: marca + acoes, depois os modos. */
+  .app-header {
+    height: auto;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 10px;
+    padding-left: max(10px, env(safe-area-inset-left, 0px));
+    padding-right: max(10px, env(safe-area-inset-right, 0px));
+  }
+
+  /* Numa faixa de 390px o nome da marca disputa espaco com o seletor de
+     tema e o botao de nova partida. O simbolo sozinho identifica o app. */
+  .logo-tag,
+  .logo-title {
+    display: none;
+  }
+
+  .logo-symbol {
+    width: 32px;
+    height: 32px;
+    font-size: 16px;
+  }
+
+  .header-actions {
+    gap: 6px;
+    flex: 1;
+    justify-content: flex-end;
+  }
+
+  #theme-select {
+    width: 132px !important;
+    flex-shrink: 1;
+    min-width: 0;
+  }
+
+  .btn-label-full { display: none; }
+  .btn-label-short { display: inline; }
+
+  .nav-tabs {
+    order: 3;
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .nav-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .nav-tab {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    padding: 7px 12px;
+  }
+
+  .main-layout {
+    padding: 8px;
+    padding-left: max(8px, env(safe-area-inset-left, 0px));
+    padding-right: max(8px, env(safe-area-inset-right, 0px));
+    padding-bottom: calc(12px + var(--safe-b));
+    gap: 10px;
+    max-width: 100%;
+  }
+
+  /* `display: contents` dissolve a coluna esquerda para que os cards dos
+     jogadores e o banner de status possam subir para cima do tabuleiro,
+     enquanto o resto desce para a aba "Partida". */
+  #sidebar-left {
+    display: contents;
+  }
+
+  #live-player-cards { order: 1; width: 100%; }
+  #game-status-banner { order: 2; width: 100%; margin: 0; }
+  .board-container-wrapper { order: 3; }
+  #panel-switch { order: 4; display: flex; width: 100%; }
+  #panel-info { order: 5; width: 100%; }
+  #sidebar-right { order: 6; }
+
+  /* Os dois jogadores lado a lado economizam ~90px de altura. */
+  #live-player-cards {
+    flex-direction: row;
+    gap: 8px;
+  }
+
+  #live-player-cards .player-card {
+    flex: 1;
+    min-width: 0;
+    margin-bottom: 0;
+    padding: 8px 10px;
+    gap: 8px;
+  }
+
+  .player-info { gap: 7px; min-width: 0; }
+  .player-stone-indicator { width: 18px; height: 18px; flex-shrink: 0; }
+  .player-name { font-size: 11.5px; line-height: 1.25; }
+  .player-captures { font-size: 10px; line-height: 1.25; }
+
+  .player-timer {
+    font-size: 12.5px;
+    padding: 3px 5px;
+    flex-shrink: 0;
+  }
+
+  #game-status-banner {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  .board-canvas-holder {
+    border-radius: var(--radius-md);
+  }
+
+  /* Barras de botoes rolam na horizontal em vez de virarem cinco linhas
+     que empurram o tabuleiro para fora da tela. */
+  .board-quick-controls {
+    width: 100%;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 6px 8px;
+    margin-top: 8px;
+    border-radius: var(--radius-md);
+  }
+
+  .board-quick-controls::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Esmaece a borda direita para deixar claro que ha mais botoes ao lado. */
+  .board-quick-controls:not(.review-controller-bar) {
+    -webkit-mask-image: linear-gradient(to right, #000 88%, transparent 100%);
+    mask-image: linear-gradient(to right, #000 88%, transparent 100%);
+  }
+
+  .board-quick-controls .btn,
+  .review-nav-group .btn {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  /* A barra de revisao tem 11 botoes; rolar na horizontal esconderia
+     "Proximo" e "Erro". Cada grupo ocupa a largura toda e quebra dentro
+     de si, mantendo os tres blocos logicos separados. */
+  .review-controller-bar {
+    flex-wrap: wrap;
+    overflow-x: hidden;
+  }
+
+  .review-nav-group,
+  .blunder-nav-group {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  /* Alvos de toque: 40px e o minimo confortavel com o polegar. */
+  .btn,
+  .btn-sm,
+  .nav-tab,
+  .segmented-btn,
+  .btn-icon {
+    min-height: 40px;
+    touch-action: manipulation;
+  }
+
+  /* Nenhum destes desfoques e visivel num celular pequeno, mas cada um
+     custa uma passada de composicao por quadro ao rolar. */
+  .card,
+  .app-header,
+  .board-quick-controls,
+  .modal-backdrop {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .card {
+    background: var(--bg-surface);
+    padding: 12px;
+  }
+
+  /* Modais viram folha inferior: um dialogo de 520px centrado deixa
+     conteudo cortado e botoes fora do alcance do polegar. */
+  .modal-backdrop {
+    padding: 0;
+    align-items: flex-end;
+  }
+
+  .modal-window {
+    max-width: 100%;
+    max-height: 92dvh;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  }
+
+  .modal-header { padding: 16px 18px; }
+  .modal-body { padding: 16px 18px; max-height: none; }
+  .modal-footer {
+    padding: 12px 18px;
+    padding-bottom: calc(12px + var(--safe-b));
+    flex-wrap: wrap;
+  }
+  .modal-footer .btn { flex: 1 1 auto; }
+
+  .segmented-control { flex-wrap: wrap; }
+
+  /* O historico nao pode roubar a tela toda; vira lista com rolagem. */
+  .move-history-panel {
+    max-height: 40dvh;
+  }
+
+  /* O cabecalho e sticky: sem isto ele cobre o topo do card ao qual o
+     navegador rolou. */
+  .card,
+  .board-container-wrapper {
+    scroll-margin-top: calc(var(--header-h) + 8px);
+  }
+
+  /* Um painel de cada vez. Sem a classe, "Partida" e o padrao. */
+  body.panel-analysis #panel-info { display: none; }
+  body:not(.panel-analysis) #sidebar-right { display: none; }
+}
+
+/* --- Telas muito estreitas --------------------------------------- */
+@media (max-width: 420px) {
+  .nav-label { display: none; }
+  .nav-icon { font-size: 17px; }
+  .nav-tab { padding: 7px 14px; }
+  .logo-title { font-size: 15px; }
+  .territory-grid { gap: 6px; }
+  .review-actions-grid { grid-template-columns: 1fr; }
+}
+
+/* --- Telas de toque: confirmacao em dois passos ------------------- */
+@media (pointer: coarse) {
+  body.touch-pending .touch-confirm-bar {
+    display: flex;
+  }
+
+  canvas#go-board {
+    cursor: default;
+    /* Sem isto o navegador rola a pagina ou da zoom enquanto o dedo
+       arrasta a pedra fantasma pelo tabuleiro. */
+    touch-action: none;
+  }
+
+  /* Estados :hover ficam "colados" depois de um toque em telas sensiveis. */
+  .btn:hover,
+  .btn-primary:hover,
+  .btn-icon:hover,
+  .nav-tab:hover,
+  .board-canvas-holder:hover {
+    transform: none;
+  }
+}
+
+/* --- Telas baixas em paisagem: cada pixel de altura conta ---------- */
+@media (max-height: 560px) and (orientation: landscape) and (max-width: 1200px) {
+  /* Deitado sobra largura de sobra e falta altura, entao o cabecalho volta
+     a uma faixa so: as abas de modo cabem ao lado da marca. */
+  .app-header {
+    position: static;
+    flex-wrap: nowrap;
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+
+  .nav-tabs {
+    order: 0;
+    width: auto;
+    flex: 1 1 auto;
+    margin: 0 8px;
+  }
+
+  .logo-area { flex-shrink: 0; }
+  .header-actions { flex: 0 0 auto; }
+
+  /* Relogios e prisioneiros valem menos que 60px de tabuleiro; o banner de
+     status logo abaixo continua dizendo de quem e a vez. */
+  #live-player-cards { display: none; }
+
+  #game-status-banner {
+    padding: 5px 10px;
+    font-size: 12px;
+  }
+
+  .board-quick-controls {
+    margin-top: 6px;
+    padding: 4px 8px;
+  }
+
+  .btn, .btn-sm, .nav-tab, .btn-icon { min-height: 34px; }
+}

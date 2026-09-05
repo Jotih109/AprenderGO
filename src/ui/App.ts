@@ -104,6 +104,13 @@ export class App {
   private hoverPoint: Point | null = null;
   private aiHint: { point: Point; winRate?: number } | null = null;
 
+  // Toque: no celular o dedo cobre a intersecao, entao o primeiro toque so
+  // marca o ponto e o segundo (ou o botao Confirmar) e que joga.
+  private readonly isTouchDevice = typeof window.matchMedia === 'function'
+    && window.matchMedia('(pointer: coarse)').matches;
+  private touchPending: Point | null = null;
+  private touchDragging = false;
+
   // Clocks
   private clockType: ClockType = 'byoyomi';
   private blackClock: PlayerClockState = App.freshClock('byoyomi');
@@ -205,6 +212,7 @@ export class App {
     this.updateBeginnerModeLabel();
     this.updatePlayerNames();
     this.initLayout();
+    this.initPanelSwitch();
     this.bindEvents();
     this.resetClocks();
     this.startClockLoop();
@@ -335,14 +343,61 @@ export class App {
 
     const timelineHeight = timelineCard && timelineCard.style.display !== 'none' ? timelineCard.offsetHeight + 10 : 0;
     const quickBarHeight = quickBar && quickBar.style.display !== 'none' ? quickBar.offsetHeight + 10 : 46;
-    const availableHeight = window.innerHeight - 64 - quickBarHeight - timelineHeight - 24;
-    const availableWidth = wrapper && wrapper.clientWidth > 100 ? wrapper.clientWidth - 16 : window.innerWidth - 96;
 
-    const targetDim = Math.max(280, Math.min(availableWidth, availableHeight, 1080));
+    // O cabecalho tem 64px no desktop e duas faixas no celular. Medir em vez de
+    // fixar o numero evita que o tabuleiro seja calculado maior que a area real.
+    const header = document.querySelector('.app-header') as HTMLElement | null;
+    const headerHeight = header?.offsetHeight || 64;
+
+    const matches = (query: string) =>
+      typeof window.matchMedia === 'function' && window.matchMedia(query).matches;
+    const isNarrow = matches('(max-width: 900px)');
+    // Celular deitado: sobra largura e falta altura, o oposto do caso em pe.
+    const isShortLandscape = matches('(max-height: 560px) and (orientation: landscape) and (max-width: 1200px)');
+
+    // No celular em pe a pagina rola e o tabuleiro nao disputa altura com as
+    // barras: ele fica proporcional a tela, deixando as abas de painel
+    // aparecendo logo abaixo — assim da para ver que existe conteudo ali.
+    // Deitado a conta se inverte: o tabuleiro pega toda a altura que sobra,
+    // senao viraria um quadrado minusculo no meio de uma faixa larga e vazia.
+    const availableHeight = isShortLandscape
+      ? Math.max(220, window.innerHeight - headerHeight - quickBarHeight - timelineHeight - 56)
+      : isNarrow
+        ? Math.max(260, Math.round(window.innerHeight * 0.72) - headerHeight)
+        : window.innerHeight - headerHeight - quickBarHeight - timelineHeight - 24;
+
+    const availableWidth = wrapper && wrapper.clientWidth > 100
+      ? wrapper.clientWidth - (isNarrow ? 2 : 16)
+      : window.innerWidth - (isNarrow ? 20 : 96);
+
+    const floor = isShortLandscape ? 220 : 260;
+    const targetDim = Math.max(floor, Math.min(availableWidth, availableHeight, 1080));
 
     this.renderer.resize(targetDim, targetDim, this.boardSize);
     this.render();
     if (isReview) this.drawWinRateChart();
+  }
+
+  /** Liga as abas que trocam o painel visivel abaixo do tabuleiro no celular. */
+  private initPanelSwitch(): void {
+    for (const btn of document.querySelectorAll<HTMLButtonElement>('.panel-switch-btn')) {
+      const panel = btn.dataset.panel === 'analysis' ? 'analysis' : 'info';
+      btn.addEventListener('click', () => this.setMobilePanel(panel));
+    }
+  }
+
+  /**
+   * Escolhe qual painel aparece abaixo do tabuleiro no celular. No desktop as
+   * duas colunas ficam visiveis de qualquer forma, entao a classe nao muda nada.
+   */
+  private setMobilePanel(panel: 'info' | 'analysis'): void {
+    document.body.classList.toggle('panel-analysis', panel === 'analysis');
+    for (const btn of document.querySelectorAll<HTMLButtonElement>('.panel-switch-btn')) {
+      const on = (btn.dataset.panel === 'analysis' ? 'analysis' : 'info') === panel;
+      btn.classList.toggle('active', on);
+      btn.setAttribute('aria-pressed', String(on));
+    }
+    this.scheduleBoardResize();
   }
 
   // -------------------------------------------------------------
@@ -365,9 +420,14 @@ export class App {
     });
 
     this.canvas.addEventListener('click', (e) => {
+      // O toque e tratado pelos eventos de ponteiro abaixo; deixar o click
+      // sintetico passar jogaria a pedra duas vezes.
+      if (this.isTouchDevice) return;
       const pt = this.renderer.screenToBoard(e.clientX, e.clientY);
       if (pt) this.handleBoardClick(pt.x, pt.y);
     });
+
+    this.bindTouchBoard();
 
     const themeSelect = document.getElementById('theme-select') as HTMLSelectElement | null;
     themeSelect?.addEventListener('change', (e) => {
@@ -736,6 +796,7 @@ export class App {
     this.isChallengeMode = false;
     this.influenceCache = null;
     this.replayBoardCache = null;
+    if (this.touchPending) this.clearTouchPending();
 
     this.board.reset(this.boardSize);
     // Handicap compensation: white keeps only the half point that breaks ties.
@@ -766,6 +827,122 @@ export class App {
       nameBlack.textContent = 'Pretas (Humano)';
       nameWhite.textContent = 'Brancas (Humano)';
     }
+  }
+
+  // -------------------------------------------------------------
+  // TOQUE: MARCAR E CONFIRMAR
+  // -------------------------------------------------------------
+
+  private bindTouchBoard(): void {
+    const canvas = this.canvas;
+
+    canvas.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse') return;
+      // Segura o gesto no canvas: sem isto o navegador rola a pagina enquanto
+      // o dedo arrasta a pedra fantasma.
+      e.preventDefault();
+      this.touchDragging = true;
+      try {
+        canvas.setPointerCapture(e.pointerId);
+      } catch {
+        // Navegadores antigos podem recusar a captura; o arrasto ainda funciona.
+      }
+      this.moveTouchGhost(e.clientX, e.clientY);
+    });
+
+    canvas.addEventListener('pointermove', (e) => {
+      if (e.pointerType === 'mouse' || !this.touchDragging) return;
+      e.preventDefault();
+      this.moveTouchGhost(e.clientX, e.clientY);
+    });
+
+    canvas.addEventListener('pointerup', (e) => {
+      if (e.pointerType === 'mouse' || !this.touchDragging) return;
+      e.preventDefault();
+      this.touchDragging = false;
+      this.resolveTouchTap(this.renderer.screenToBoard(e.clientX, e.clientY));
+    });
+
+    canvas.addEventListener('pointercancel', (e) => {
+      if (e.pointerType === 'mouse') return;
+      this.touchDragging = false;
+    });
+
+    document.getElementById('btn-touch-confirm')?.addEventListener('click', () => {
+      const pt = this.touchPending;
+      this.clearTouchPending();
+      if (pt) this.handleBoardClick(pt.x, pt.y);
+    });
+
+    document.getElementById('btn-touch-cancel')?.addEventListener('click', () => {
+      this.clearTouchPending();
+    });
+  }
+
+  /** Arrasta a pedra fantasma junto com o dedo, sem jogar nada. */
+  private moveTouchGhost(clientX: number, clientY: number): void {
+    const pt = this.renderer.screenToBoard(clientX, clientY);
+    const changed = (pt?.x ?? -1) !== (this.hoverPoint?.x ?? -1)
+      || (pt?.y ?? -1) !== (this.hoverPoint?.y ?? -1);
+    if (!changed) return;
+    this.hoverPoint = pt;
+    this.scheduleRender();
+  }
+
+  /**
+   * Um toque num ponto novo apenas marca; repetir o toque no ponto ja marcado
+   * (ou usar o botao Confirmar) e que joga. Vale so para colocar pedras —
+   * navegar na revisao ou marcar grupos mortos continua num toque so, porque
+   * essas acoes se desfazem sozinhas.
+   */
+  private resolveTouchTap(pt: Point | null): void {
+    if (!pt) {
+      this.clearTouchPending();
+      return;
+    }
+
+    if (!this.placementNeedsConfirm()) {
+      this.clearTouchPending();
+      this.handleBoardClick(pt.x, pt.y);
+      return;
+    }
+
+    if (this.touchPending && this.touchPending.x === pt.x && this.touchPending.y === pt.y) {
+      this.clearTouchPending();
+      this.handleBoardClick(pt.x, pt.y);
+      return;
+    }
+
+    this.touchPending = pt;
+    this.hoverPoint = pt;
+    document.body.classList.add('touch-pending');
+    const label = document.getElementById('touch-confirm-coord');
+    if (label) label.textContent = `${COLUMN_LETTERS[pt.x] ?? '?'}${this.boardSize - pt.y}`;
+    const bar = document.getElementById('touch-confirm-bar');
+    if (bar) bar.hidden = false;
+    this.scheduleRender();
+  }
+
+  private clearTouchPending(): void {
+    this.touchPending = null;
+    this.hoverPoint = null;
+    this.touchDragging = false;
+    document.body.classList.remove('touch-pending');
+    const bar = document.getElementById('touch-confirm-bar');
+    if (bar) bar.hidden = true;
+    this.scheduleRender();
+  }
+
+  /** True quando o toque colocaria uma pedra de verdade no tabuleiro. */
+  private placementNeedsConfirm(): boolean {
+    if (!this.isTouchDevice) return false;
+    if (this.isScoringPhase) return false;
+    if (this.mode === 'review') return this.isSandboxMode || this.isChallengeMode;
+    if (this.mode === 'joseki' || this.mode === 'eve') return false;
+    if (this.board.isGameOver) return false;
+    if (this.replayIndex !== -1) return false;
+    if (this.mode === 'pve' && (this.botThinking || this.board.turn !== this.playerColor)) return false;
+    return true;
   }
 
   private handleBoardClick(x: number, y: number): void {
@@ -827,6 +1004,7 @@ export class App {
   }
 
   private onMovePlayed(): void {
+    if (this.touchPending) this.clearTouchPending();
     this.influenceCache = null;
     this.replayBoardCache = null;
     this.updateUI();
@@ -1084,7 +1262,8 @@ export class App {
       if (el) el.style.display = visible ? display : 'none';
     };
 
-    show('live-player-cards', !isReview);
+    if (this.touchPending) this.clearTouchPending();
+    show('live-player-cards', !isReview, 'flex');
     show('review-summary-card', isReview);
     show('live-eval-card', !isReview);
     show('territory-widget-card', !isReview);
@@ -1096,6 +1275,15 @@ export class App {
     document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
     document.getElementById(isReview ? 'tab-review' : 'tab-play')?.classList.add('active');
     if (isReview) this.showStatus('Modo de Revisão ativo. Navegue pelos lances abaixo.', '📊');
+
+    // No celular só um painel aparece por vez, então os rótulos acompanham o
+    // que está de fato em cada um — e entrar na revisão abre direto a análise
+    // do lance, senão "Próx. Erro" mudaria um card fora da tela.
+    const infoTab = document.querySelector<HTMLElement>('.panel-switch-btn[data-panel="info"]');
+    const analysisTab = document.querySelector<HTMLElement>('.panel-switch-btn[data-panel="analysis"]');
+    if (infoTab) infoTab.textContent = isReview ? 'Relatório' : 'Partida';
+    if (analysisTab) analysisTab.textContent = isReview ? 'Análise' : 'Histórico';
+    this.setMobilePanel(isReview ? 'analysis' : 'info');
 
     this.updateBoardSize();
   }

@@ -50,11 +50,44 @@ export class BoardRenderer {
     const context = canvas.getContext('2d', { alpha: false });
     if (!context) throw new Error('Cannot get 2D context');
     this.ctx = context;
-    this.dpr = window.devicePixelRatio || 1;
+    this.dpr = BoardRenderer.effectiveDpr();
+  }
+
+  /**
+   * Margem entre a borda do canvas e a linha externa do tabuleiro.
+   *
+   * As coordenadas sao desenhadas a 0,65 celula para fora dessa linha, com a
+   * fonte proporcional a celula. Num 9x9 a celula e mais que o dobro da de um
+   * 19x19 do mesmo tamanho, entao a margem fixa de 5,5% nao cabia o rotulo e
+   * as letras saiam cortadas pela borda do canvas. Aqui a margem cresce ate
+   * caber: cada passo encolhe a celula, o que por sua vez reduz a margem
+   * necessaria, entao o laco converge em duas ou tres voltas.
+   */
+  private static paddingFor(minDim: number, boardSize: BoardSize): number {
+    let padding = Math.max(24, Math.floor(minDim * 0.055));
+    for (let i = 0; i < 4; i++) {
+      const cell = (minDim - padding * 2) / (boardSize - 1);
+      const labelHalf = Math.max(cell * 0.18, 5);
+      const needed = Math.ceil(cell * 0.65 + labelHalf + 4);
+      if (needed <= padding) break;
+      padding = needed;
+    }
+    return padding;
+  }
+
+  /**
+   * Celulares reportam devicePixelRatio 3 ou 4. Acima de 2 nao da para
+   * distinguir a diferenca num goban, mas a area a pintar cresce com o
+   * quadrado: 3x custa 2,25 vezes mais pixels que 2x a cada quadro, o que
+   * aparece como travada ao arrastar a pedra fantasma. O teto fica em 2.
+   */
+  private static effectiveDpr(): number {
+    const raw = window.devicePixelRatio || 1;
+    return Math.min(raw, 2);
   }
 
   public resize(width: number, height: number, boardSize: BoardSize = 19): void {
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = BoardRenderer.effectiveDpr();
     if (this.width === width && this.height === height && this.boardSize === boardSize && this.dpr === dpr) {
       return; // nothing changed, keep the cached layers
     }
@@ -70,7 +103,7 @@ export class BoardRenderer {
     this.canvas.style.height = `${height}px`;
 
     const minDim = Math.min(width, height);
-    this.padding = Math.max(24, Math.floor(minDim * 0.055));
+    this.padding = BoardRenderer.paddingFor(minDim, boardSize);
     const playableArea = minDim - this.padding * 2;
     this.cellSize = playableArea / (this.boardSize - 1);
 

@@ -1,22 +1,20 @@
-// Vite builds a single self-contained page from index.dev.html. This copies the
-// result to the filenames the project ships with, cross-platform (the previous
-// version shelled out to PowerShell and only worked on Windows).
-import { copyFileSync, existsSync, rmSync } from 'node:fs';
+// Vite builds a single self-contained page from index.dev.html, but names the
+// output after the entry file. Rename it to index.html so `dist/` is a folder
+// any static host can serve as-is.
+//
+// Earlier this also copied the page to `index.html` and `JOGAR.html` at the
+// repo root. Those were byte-identical twins of dist/index.html — three copies
+// of a 260 KB file in every commit — so the build now produces one.
+import { existsSync, renameSync, rmSync } from 'node:fs';
 
 const source = 'dist/index.dev.html';
+const target = 'dist/index.html';
 
 if (!existsSync(source)) {
   console.error(`postbuild: ${source} not found — did vite build succeed?`);
   process.exit(1);
 }
 
-const targets = ['index.html', 'JOGAR.html', 'dist/index.html'];
-
-for (const target of targets) {
-  copyFileSync(source, target);
-  console.log(`postbuild: wrote ${target}`);
-}
-
-// Vite names its output after the entry file, which leaves dist/index.dev.html
-// as a byte-identical twin of dist/index.html. Drop it so dist holds one page.
-rmSync(source, { force: true });
+rmSync(target, { force: true });
+renameSync(source, target);
+console.log(`postbuild: wrote ${target}`);

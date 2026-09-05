@@ -6,8 +6,8 @@ suporte a SGF.
 
 ## Como jogar
 
-**Mais simples:** dê dois cliques em `JOGAR.bat`. Ele instala as dependências na
-primeira vez, sobe o servidor e abre o jogo no navegador.
+**No computador, mais simples:** dê dois cliques em `JOGAR.bat`. Ele instala as
+dependências na primeira vez, sobe o servidor e abre o jogo no navegador.
 
 **Ou pela linha de comando:**
 
@@ -16,16 +16,45 @@ npm install
 npm run dev      # http://localhost:3000
 ```
 
-`index.html` e `JOGAR.html` são versões de arquivo único, geradas pelo build e
-prontas para abrir direto. Rodando pelo servidor a IA usa um Web Worker e não
-trava a interface; abrindo o arquivo direto ela roda na mesma thread.
+`npm run build` gera `dist/`, e `dist/index.html` é o jogo inteiro num único
+arquivo — HTML, CSS, JavaScript e a IA, sem nenhuma requisição externa. Dá para
+abrir esse arquivo direto do disco, mas aí a IA roda na mesma thread da
+interface (workers em `blob:` são bloqueados na origem `file://`); servido por
+HTTP ela vai para um Web Worker e a interface não trava.
+
+## No celular
+
+O jogo foi feito para caber na tela de um telefone: o tabuleiro fica logo abaixo
+do cabeçalho, as barras de botões rolam na horizontal e os painéis laterais
+viram duas abas — "Partida" e "Histórico" numa partida, "Relatório" e "Análise"
+na revisão.
+
+Para colocar pedras, o toque é em **dois passos**: o primeiro marca o ponto e
+mostra uma pedra fantasma — dá para arrastar o dedo até acertar a interseção —
+e o segundo toque no mesmo ponto (ou o botão **✓ Confirmar**) é que joga. Num
+19x19 de 370px cada interseção tem uns 17px, então confirmar evita a jogada
+errada que não dá para desfazer contra o relógio.
+
+Pelo navegador do celular, "Adicionar à tela de início" instala o jogo como app:
+ele abre em tela cheia, sem barra de endereço.
+
+## Publicar de graça
+
+O site é estático e cabe numa única requisição de ~75 KB comprimidos, então
+qualquer hospedagem gratuita serve:
+
+| Onde | Como |
+| --- | --- |
+| **GitHub Pages** | Já vem configurado: `.github/workflows/deploy.yml` roda os testes e publica a cada push na `main`. Basta ligar Pages com origem "GitHub Actions" nas configurações do repositório. |
+| **Netlify / Cloudflare Pages** | Comando de build `npm run build`, pasta de publicação `dist`. O arquivo `public/_headers` já cuida do cache. |
+| **Netlify Drop / Surge** | Rode `npm run build` e arraste a pasta `dist`. |
 
 ## Scripts
 
 | Comando | O que faz |
 | --- | --- |
 | `npm run dev` | Servidor de desenvolvimento com recarga automática |
-| `npm run build` | Verifica os tipos, gera o arquivo único e atualiza `index.html` / `JOGAR.html` |
+| `npm run build` | Verifica os tipos e gera `dist/` (página única + ícones + manifesto) |
 | `npm test` | Suíte de testes (regras, pontuação, SGF e motor de busca) |
 | `npm run typecheck` | Só a checagem de tipos |
 | `npm run check` | `typecheck` + `test` |
@@ -71,6 +100,8 @@ src/
     App.ts            Estado da aplicação e ligação com o DOM
     BoardRenderer.ts  Desenho do tabuleiro em canvas
   data/               Tsumegos, josekis, partidas de exemplo e glossário
+  styles/main.css     Estilos, com o bloco responsivo no fim do arquivo
+public/               Copiado para dist/ como está: ícones, manifesto, _headers
 tests/                Testes, sem framework externo
 ```
 

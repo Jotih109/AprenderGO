@@ -2,11 +2,16 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Go Master - Jogo de Go Completo e Profissional (Weiqi / Baduk)</title>
   <meta name="description" content="Jogo de Go (Weiqi / Baduk) completo em português com inteligência artificial multinível (MCTS), análise pós-jogo detalhada, problemas Tsumego, explorador de Joseki e suporte a SGF.">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23dc9e4f'/%3E%3Ccircle cx='11' cy='11' r='6' fill='%23141518'/%3E%3Ccircle cx='21' cy='21' r='6' fill='%23f8fafc'/%3E%3C/svg%3E">
   <meta name="theme-color" content="#0c0e14">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Go Master">
+  <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="/src/styles/main.css">
 </head>
 <body>
@@ -30,19 +35,19 @@
     <!-- Navegação por Modos de Jogo / Estudo -->
     <nav class="nav-tabs" aria-label="Navegação de Modos">
       <button class="nav-tab active" id="tab-play" data-mode="play" title="Jogar Partida de Go">
-        <span>🎮 Partida</span>
+        <span class="nav-icon" aria-hidden="true">🎮</span><span class="nav-label">Partida</span>
       </button>
       <button class="nav-tab" id="tab-review" data-mode="review" title="Análise Pós-Jogo e Revisão com IA">
-        <span>📊 Revisão Pós-Jogo</span>
+        <span class="nav-icon" aria-hidden="true">📊</span><span class="nav-label">Revisão Pós-Jogo</span>
       </button>
       <button class="nav-tab" id="tab-tsumego" data-mode="tsumego" title="Resolver Desafios de Vida e Morte (Tsumego)">
-        <span>🧩 Tsumego</span>
+        <span class="nav-icon" aria-hidden="true">🧩</span><span class="nav-label">Tsumego</span>
       </button>
       <button class="nav-tab" id="tab-joseki" data-mode="joseki" title="Explorador de Sequências de Abertura nos Cantos">
-        <span>📖 Joseki</span>
+        <span class="nav-icon" aria-hidden="true">📖</span><span class="nav-label">Joseki</span>
       </button>
       <button class="nav-tab" id="tab-rules" data-mode="rules" title="Guia Completo de Regras e Conceitos">
-        <span>📜 Regras & Guia</span>
+        <span class="nav-icon" aria-hidden="true">📜</span><span class="nav-label">Regras &amp; Guia</span>
       </button>
     </nav>
 
@@ -63,7 +68,7 @@
 
       <!-- Botão Nova Partida -->
       <button id="btn-new-game-modal" class="btn btn-primary btn-sm" title="Criar uma nova partida personalizada">
-        <span>+ Nova Partida</span>
+        <span class="btn-label-full">+ Nova Partida</span><span class="btn-label-short" aria-hidden="true">+ Nova</span>
       </button>
     </div>
   </header>
@@ -104,6 +109,15 @@
           <div class="player-timer" id="timer-white" title="Tempo restante">10:00</div>
         </div>
       </div>
+
+      <!-- Banner de Status / Vez do Jogador -->
+      <div class="game-status-banner" id="game-status-banner">
+        <span id="status-icon" aria-hidden="true">🎯</span>
+        <span id="status-text">Vez das Pretas (Jogada 1)</span>
+      </div>
+
+      <!-- Cards abaixo formam o painel "Partida" (aba no celular, coluna no desktop) -->
+      <div class="panel-group" id="panel-info">
 
       <!-- Relatório Geral da Análise (Exibido no Modo Revisão) -->
       <div class="card review-card" id="review-summary-card" style="display: none;">
@@ -165,12 +179,6 @@
           </div>
           <div id="review-study-plan" class="study-plan-list"></div>
         </div>
-      </div>
-
-      <!-- Banner de Status / Vez do Jogador -->
-      <div class="game-status-banner" id="game-status-banner">
-        <span id="status-icon" aria-hidden="true">🎯</span>
-        <span id="status-text">Vez das Pretas (Jogada 1)</span>
       </div>
 
       <!-- Barra de Avaliação em Tempo Real (Modo Ao Vivo) -->
@@ -238,6 +246,8 @@
           </button>
         </div>
       </div>
+
+      </div><!-- /#panel-info -->
     </aside>
 
     <!-- ------------------------------------------------------------- -->
@@ -247,6 +257,17 @@
       <!-- Container do Canvas do Tabuleiro (Goban) -->
       <div class="board-canvas-holder" id="board-canvas-holder">
         <canvas id="go-board" width="600" height="600"></canvas>
+      </div>
+
+      <!-- Confirmação de jogada por toque (aparece só em telas sensíveis ao toque) -->
+      <div class="touch-confirm-bar" id="touch-confirm-bar" hidden>
+        <span class="touch-confirm-coord" id="touch-confirm-coord">—</span>
+        <button id="btn-touch-confirm" class="btn btn-primary btn-sm" title="Confirmar a jogada na posição marcada">
+          <span>✓ Confirmar</span>
+        </button>
+        <button id="btn-touch-cancel" class="btn btn-secondary btn-sm" title="Cancelar a marcação">
+          <span>✕</span>
+        </button>
       </div>
 
       <!-- Linha do Tempo de Probabilidade de Vitória (Modo Revisão) -->
@@ -336,7 +357,15 @@
     </section>
 
     <!-- ------------------------------------------------------------- -->
-    <!-- 2.3 PAINEL LATERAL DIREITO: Análise do Lance e Histórico      -->
+    <!-- 2.3 ALTERNADOR DE PAINÉIS (somente telas estreitas)            -->
+    <!-- ------------------------------------------------------------- -->
+    <nav class="panel-switch" id="panel-switch" aria-label="Alternar painel lateral">
+      <button class="panel-switch-btn active" data-panel="info" aria-pressed="true">Partida</button>
+      <button class="panel-switch-btn" data-panel="analysis" aria-pressed="false">Histórico</button>
+    </nav>
+
+    <!-- ------------------------------------------------------------- -->
+    <!-- 2.4 PAINEL LATERAL DIREITO: Análise do Lance e Histórico      -->
     <!-- ------------------------------------------------------------- -->
     <aside class="sidebar-panel" id="sidebar-right" aria-label="Análise e Histórico de Jogadas">
       <!-- Cartão de Análise do Lance Selecionado (Modo Revisão) -->

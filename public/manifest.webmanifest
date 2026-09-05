@@ -1,0 +1,28 @@
+{
+  "name": "Go Master — Weiqi / Baduk",
+  "short_name": "Go Master",
+  "description": "Jogo de Go completo em português: IA com busca MCTS, análise pós-jogo, tsumego, joseki e suporte a SGF.",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0c0e14",
+  "theme_color": "#0c0e14",
+  "categories": ["games", "education"],
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
