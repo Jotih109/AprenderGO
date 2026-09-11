@@ -33,6 +33,7 @@ if not exist "node_modules" (
 )
 
 echo [INFO] Iniciando o servidor e abrindo o jogo no seu navegador...
+echo Vacalo...
 echo [DICA] Deixe esta janela aberta enquanto joga. Para encerrar, basta fecha-la.
 echo.
 
