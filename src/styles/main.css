@@ -1951,6 +1951,17 @@ canvas#go-board {
   white-space: nowrap;
 }
 
+/* As alternativas da revisao sao clicaveis (abrem a variacao); as do
+   observador sao so leitura, entao nao fingem ser botao. */
+.observer-card .alt-move-card {
+  cursor: default;
+}
+
+.observer-card .alt-move-card:hover {
+  border-color: var(--border-color);
+  background: rgba(0, 0, 0, 0.3);
+}
+
 /* --- Barra de controle ------------------------------------------- */
 
 .observer-bar .review-nav-group {

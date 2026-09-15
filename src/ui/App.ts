@@ -339,6 +339,7 @@ export class App {
         '.board-container-wrapper',
         '#board-quick-controls',
         '#review-quick-controls',
+        '#observe-quick-controls',
         '#winrate-chart-card'
       ]) {
         const el = document.querySelector(selector);
@@ -362,7 +363,15 @@ export class App {
 
     const wrapper = document.querySelector('.board-container-wrapper') as HTMLElement | null;
     const isReview = this.mode === 'review';
-    const quickBar = document.getElementById(isReview ? 'review-quick-controls' : 'board-quick-controls');
+    // Each mode has its own bar under the board, and they are not the same
+    // height: the observer's wraps to two rows on a phone. Measuring the hidden
+    // one left the board 50px taller than the space it actually had.
+    const barId = isReview
+      ? 'review-quick-controls'
+      : this.mode === 'observe'
+        ? 'observe-quick-controls'
+        : 'board-quick-controls';
+    const quickBar = document.getElementById(barId);
     const timelineCard = isReview ? document.getElementById('winrate-chart-card') : null;
 
     const timelineHeight = timelineCard && timelineCard.style.display !== 'none' ? timelineCard.offsetHeight + 10 : 0;
@@ -1664,6 +1673,8 @@ export class App {
 
   private handleUndo(): void {
     if (this.mode === 'review' || this.mode === 'joseki') return;
+    // Undoing here would leave the commentary list one move ahead of the board.
+    if (this.mode === 'observe') return;
     if (this.board.history.length === 0) return;
 
     // Drop whatever the bot is thinking about; that position is being rewound.
@@ -1691,6 +1702,9 @@ export class App {
 
   private async handleRequestHint(): Promise<void> {
     if (this.board.isGameOver || this.isScoringPhase || this.mode === 'review') return;
+    // The exhibition already owns the engine; a second search would fight it
+    // over `botThinking` and could drop the move being thought about.
+    if (this.mode === 'observe') return;
     if (this.botThinking) return;
 
     this.botThinking = true;
@@ -2902,7 +2916,8 @@ export class App {
     const hasLiveGame = this.board.movesList.length > 0 && !this.board.isGameOver && this.mode !== 'review';
     const leavingPlay = tabName !== 'play' && (this.mode === 'pve' || this.mode === 'pvp' || this.mode === 'eve');
     // Leaving the exhibition costs nothing — it is not the viewer's game.
-    if (tabName !== 'observe' && this.mode === 'observe') this.stopObservation();
+    const leavingObserve = tabName !== 'observe' && this.mode === 'observe';
+    if (leavingObserve) this.stopObservation();
     if (hasLiveGame && leavingPlay && !window.confirm('Sair da partida atual? O progresso será perdido.')) {
       document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
       document.getElementById(this.mode === 'review' ? 'tab-review' : 'tab-play')?.classList.add('active');
@@ -2915,7 +2930,10 @@ export class App {
     const specialCard = document.getElementById('special-mode-card');
 
     if (tabName === 'play') {
+      // Without `leavingObserve` here, the half-played exhibition became the
+      // viewer's own game: same board, now clickable, with the AI's stones on it.
       const restarting =
+        leavingObserve ||
         this.mode === 'review' || this.mode === 'tsumego' || this.mode === 'joseki' || this.board.isGameOver;
       this.mode = 'pve';
       this.setReviewModeUI(false);
@@ -2935,8 +2953,10 @@ export class App {
       }
     } else if (tabName === 'observe') {
       if (specialCard) specialCard.style.display = 'none';
-      // Coming back to a finished or running exhibition keeps it; otherwise a
-      // fresh one starts, so the tab always lands on something to watch.
+      // Clicking the tab you are already on should not throw the game away.
+      // Arriving from anywhere else always starts fresh: the board is shared
+      // with the other modes, so a kept exhibition would end up commenting on
+      // someone else's position.
       if (this.mode === 'observe' && this.observeCommentaries.length > 0) {
         this.setReviewModeUI(false);
         this.render();
