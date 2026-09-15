@@ -116,6 +116,16 @@ function ownTerritoryArea(board: GoBoard, pt: Point, color: Color): number {
 }
 
 export class MoveInsights {
+  /**
+   * Groups of one colour that are down to a single liberty, with the point that
+   * would capture them. Exposed because the observer commentary needs the same
+   * reading of the position after the move, and a second copy of this loop
+   * would be one more place for the two answers to drift apart.
+   */
+  public static atariGroups(board: GoBoard, color: Color): { size: number; liberty: Point | null; sample: Point }[] {
+    return atariGroups(board, color);
+  }
+
   /** Reads the position before the move. Call this while the board still shows it. */
   public static capture(board: GoBoard, move: Move): PreMoveFacts {
     const color = move.color;

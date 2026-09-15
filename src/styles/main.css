@@ -1761,6 +1761,203 @@ canvas#go-board {
 
 
 /* ============================================================
+   MODO OBSERVADOR: duas IAs jogando, com o porque de cada lance
+   ============================================================ */
+
+/* Texto de apoio abaixo de um campo do formulario. */
+.form-hint {
+  margin-top: 6px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.observer-status-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.observer-status-box {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+}
+
+.observer-status-label {
+  color: var(--text-muted);
+  font-size: 11px;
+  margin-bottom: 2px;
+}
+
+.observer-status-value {
+  font-weight: 700;
+  font-size: 16px;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+/* Texto no lugar de um numero: nao pode ficar do tamanho do numero. */
+.observer-status-value.observer-status-soft {
+  font-family: var(--font-main);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.observer-status-wide {
+  grid-column: 1 / -1;
+}
+
+.observer-status-line {
+  margin-top: 10px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+/* Enquanto a busca roda, a linha de status pulsa de leve — e para de pulsar
+   assim que o lance sai, que e o sinal de "pode ler". */
+.observer-status-line.thinking {
+  color: var(--accent-gold);
+  animation: observerPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes observerPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+.observer-move-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.observer-move-head .player-stone-indicator {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.observer-headline {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--accent-gold);
+  line-height: 1.25;
+  margin-bottom: 12px;
+}
+
+.observer-section {
+  margin-bottom: 12px;
+}
+
+.observer-section-label {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.observer-text {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  background: rgba(0, 0, 0, 0.25);
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--accent-gold);
+}
+
+/* O "quando" e a licao que o observador leva para as proprias partidas, entao
+   ganha uma cor diferente do "por que", que fala so desta posicao. */
+.observer-section.lesson .observer-text {
+  border-left-color: var(--accent-cyan);
+}
+
+.observer-concept-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+/* --- Lista de lances comentados ---------------------------------- */
+
+.observer-feed {
+  grid-template-columns: 1fr;
+  font-family: var(--font-main);
+  font-size: 12px;
+  max-height: 300px;
+}
+
+.observer-feed-entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  transition: background 0.15s ease, border-color 0.15s ease;
+  text-align: left;
+  width: 100%;
+  font: inherit;
+}
+
+.observer-feed-entry:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.observer-feed-entry.active {
+  border-color: var(--accent-gold);
+  background: var(--accent-gold-subtle);
+  color: var(--text-primary);
+}
+
+.observer-feed-num {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  min-width: 26px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.observer-feed-stone {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.observer-feed-coord {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--text-primary);
+  min-width: 34px;
+  flex-shrink: 0;
+}
+
+.observer-feed-kind {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- Barra de controle ------------------------------------------- */
+
+.observer-bar .review-nav-group {
+  gap: 6px;
+}
+
+/* ============================================================
    BARRA DE CONFIRMACAO POR TOQUE E ALTERNADOR DE PAINEIS
    Ambos existem so em telas sensiveis ao toque / estreitas;
    o desktop nunca os ve.
@@ -1986,7 +2183,7 @@ canvas#go-board {
   }
 
   /* Esmaece a borda direita para deixar claro que ha mais botoes ao lado. */
-  .board-quick-controls:not(.review-controller-bar) {
+  .board-quick-controls:not(.review-controller-bar):not(.observer-bar) {
     -webkit-mask-image: linear-gradient(to right, #000 88%, transparent 100%);
     mask-image: linear-gradient(to right, #000 88%, transparent 100%);
   }
@@ -2000,7 +2197,8 @@ canvas#go-board {
   /* A barra de revisao tem 11 botoes; rolar na horizontal esconderia
      "Proximo" e "Erro". Cada grupo ocupa a largura toda e quebra dentro
      de si, mantendo os tres blocos logicos separados. */
-  .review-controller-bar {
+  .review-controller-bar,
+  .observer-bar {
     flex-wrap: wrap;
     overflow-x: hidden;
   }
@@ -2009,6 +2207,17 @@ canvas#go-board {
   .blunder-nav-group {
     flex: 1 1 100%;
     flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  /* Os seis botoes do observador cabem em duas linhas cheias; forcar cada
+     grupo a ocupar a largura toda espalhava-os em degraus. */
+  .observer-bar {
+    justify-content: center;
+  }
+
+  .observer-bar .review-nav-group {
+    flex: 0 1 auto;
     justify-content: center;
   }
 
@@ -2030,6 +2239,17 @@ canvas#go-board {
   .modal-backdrop {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
+  }
+
+  /* Sem o desfoque por tras, um fundo semitransparente deixa o conteudo da
+     pagina aparecer atraves da barra fixa ao rolar. Estes tres precisam ficar
+     opacos. */
+  .app-header {
+    background: #121520;
+  }
+
+  .board-quick-controls {
+    background: var(--bg-surface);
   }
 
   .card {

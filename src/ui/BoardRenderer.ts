@@ -20,6 +20,12 @@ export interface RenderOptions {
   reviewBadge?: { point: Point; symbol: string; color: string } | null;
   reviewAlternatives?: AlternativeMove[];
   variationGhostMoves?: { point: Point; color: Color; step: number }[];
+  /**
+   * Points the written commentary is talking about — the group in atari, the
+   * stone an extension answers. Marked with a ring so the reader's eye lands
+   * on the right part of the board without hunting for the coordinate.
+   */
+  highlightPoints?: Point[];
 }
 
 export class BoardRenderer {
@@ -180,6 +186,9 @@ export class BoardRenderer {
     }
     if (options.variationGhostMoves && options.variationGhostMoves.length > 0) {
       this.drawVariationGhostMoves(options.variationGhostMoves, offsetX, offsetY);
+    }
+    if (options.highlightPoints && options.highlightPoints.length > 0) {
+      this.drawHighlights(options.highlightPoints, offsetX, offsetY);
     }
 
     // 6. AI hint and hover preview.
@@ -777,6 +786,30 @@ export class BoardRenderer {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(badge.symbol, bx, by);
+    ctx.restore();
+  }
+
+  /** Amber rings around the points the commentary mentions. */
+  private drawHighlights(points: Point[], offsetX: number, offsetY: number): void {
+    const ctx = this.ctx;
+    const startX = offsetX + this.padding;
+    const startY = offsetY + this.padding;
+
+    ctx.save();
+    ctx.strokeStyle = 'rgba(245, 158, 11, 0.95)';
+    ctx.lineWidth = Math.max(1.6, this.cellSize * 0.075);
+    ctx.setLineDash([this.cellSize * 0.22, this.cellSize * 0.16]);
+    for (const pt of points.slice(0, 6)) {
+      ctx.beginPath();
+      ctx.arc(
+        startX + pt.x * this.cellSize,
+        startY + pt.y * this.cellSize,
+        this.cellSize * 0.52,
+        0,
+        Math.PI * 2
+      );
+      ctx.stroke();
+    }
     ctx.restore();
   }
 

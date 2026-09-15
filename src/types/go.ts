@@ -18,7 +18,7 @@ export interface Move {
   moveNumber?: number;
 }
 
-export type GameMode = 'pvp' | 'pve' | 'eve' | 'tsumego' | 'joseki' | 'review';
+export type GameMode = 'pvp' | 'pve' | 'eve' | 'observe' | 'tsumego' | 'joseki' | 'review';
 
 export type RuleSet = 'japanese' | 'chinese';
 

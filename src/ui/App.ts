@@ -24,6 +24,7 @@ import { BotManager } from '../ai/BotManager';
 import { BoardRenderer } from './BoardRenderer';
 import { GameReviewer, ReviewCancelledError } from '../ai/GameReviewer';
 import { InsightSeverity } from '../ai/MoveInsights';
+import { MoveCommentary, MoveNarrator } from '../ai/MoveNarrator';
 import { CONCEPTS, CONCEPT_ORDER, ConceptId } from '../data/concepts';
 import { TSUMEGO_PROBLEMS } from '../data/tsumegoData';
 import { JOSEKI_PATTERNS } from '../data/josekiData';
@@ -65,6 +66,9 @@ interface PersistedSettings {
   boardSize: BoardSize;
   clockType: ClockType;
   ruleSet: RuleSet;
+  observeSize: BoardSize;
+  observeLevel: number;
+  observePaceMs: number;
 }
 
 const SETTINGS_KEY = 'goMaster.settings.v2';
@@ -110,6 +114,19 @@ export class App {
     && window.matchMedia('(pointer: coarse)').matches;
   private touchPending: Point | null = null;
   private touchDragging = false;
+
+  // Observer mode: two engines play, every move comes with its reason.
+  private observeSize: BoardSize = 13;
+  private observeLevel = 5;
+  /** Reading pause added after each move. 0 means the viewer steps manually. */
+  private observePaceMs = 8000;
+  private observeCommentaries: MoveCommentary[] = [];
+  /** Which commentary is on screen; -1 follows the newest move. */
+  private observeIndex = -1;
+  private observePaused = false;
+  private observeTimer: number | null = null;
+  /** Bumped on every restart so a search in flight cannot resume a dead game. */
+  private observeRun = 0;
 
   // Clocks
   private clockType: ClockType = 'byoyomi';
@@ -214,6 +231,7 @@ export class App {
     this.initLayout();
     this.initPanelSwitch();
     this.bindEvents();
+    this.bindObserverControls();
     this.resetClocks();
     this.startClockLoop();
     this.updateBoardSize();
@@ -254,6 +272,9 @@ export class App {
       if (s.clockType) this.clockType = s.clockType;
       if (s.ruleSet) this.ruleSet = s.ruleSet;
       if (typeof s.soundEnabled === 'boolean') this.pendingSoundEnabled = s.soundEnabled;
+      if (s.observeSize === 9 || s.observeSize === 13 || s.observeSize === 19) this.observeSize = s.observeSize;
+      if (typeof s.observeLevel === 'number') this.observeLevel = s.observeLevel;
+      if (typeof s.observePaceMs === 'number') this.observePaceMs = s.observePaceMs;
     } catch {
       // Corrupt or unavailable storage is not worth interrupting startup for.
     }
@@ -272,7 +293,10 @@ export class App {
         botLevel: this.botLevel,
         boardSize: this.boardSize,
         clockType: this.clockType,
-        ruleSet: this.ruleSet
+        ruleSet: this.ruleSet,
+        observeSize: this.observeSize,
+        observeLevel: this.observeLevel,
+        observePaceMs: this.observePaceMs
       };
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
     } catch {
@@ -682,10 +706,14 @@ export class App {
       if (this.isAnyModalOpen()) return;
 
       const inReview = this.mode === 'review';
+      const inObserve = this.mode === 'observe';
 
       switch (e.code) {
         case 'Space':
-          if (!inReview) {
+          if (inObserve) {
+            e.preventDefault();
+            this.toggleObservePause();
+          } else if (!inReview) {
             e.preventDefault();
             this.handlePass();
           }
@@ -727,19 +755,23 @@ export class App {
           break;
         case 'ArrowLeft':
           e.preventDefault();
-          this.stepReplay(-1);
+          if (inObserve) this.stepObserveCommentary(-1);
+          else this.stepReplay(-1);
           break;
         case 'ArrowRight':
           e.preventDefault();
-          this.stepReplay(1);
+          if (inObserve) this.stepObserveCommentary(1);
+          else this.stepReplay(1);
           break;
         case 'Home':
           e.preventDefault();
-          this.jumpReplay(0);
+          if (inObserve) this.selectObserveMove(0);
+          else this.jumpReplay(0);
           break;
         case 'End':
           e.preventDefault();
-          this.jumpReplay(-1);
+          if (inObserve) this.selectObserveMove(-1);
+          else this.jumpReplay(-1);
           break;
         default:
           break;
@@ -815,6 +847,13 @@ export class App {
     const nameBlack = document.getElementById('name-black');
     const nameWhite = document.getElementById('name-white');
     if (!nameBlack || !nameWhite) return;
+
+    if (this.mode === 'observe') {
+      const label = `IA Nv. ${this.observeLevel}`;
+      nameBlack.textContent = `Pretas (${label})`;
+      nameWhite.textContent = `Brancas (${label})`;
+      return;
+    }
 
     const botLabel = `Bot Nv. ${this.botLevel}`;
     if (this.mode === 'eve') {
@@ -965,6 +1004,7 @@ export class App {
 
     if (this.mode === 'joseki') return; // the joseki explorer is driven by its buttons
     if (this.mode === 'eve') return;
+    if (this.mode === 'observe') return; // watching only; the board is not clickable
     if (this.mode === 'pve' && (this.botThinking || this.board.turn !== this.playerColor)) return;
 
     // Clicking while reviewing an earlier position jumps back to live play.
@@ -1075,10 +1115,525 @@ export class App {
     this.canvas.style.cursor = busy ? 'progress' : 'pointer';
   }
 
+
+  // -------------------------------------------------------------
+  // OBSERVER MODE: two engines play, every move comes with its reason
+  // -------------------------------------------------------------
+
+  /**
+   * Starts a fresh exhibition game.
+   *
+   * The run counter is bumped first: a search started by the previous game can
+   * still be in flight, and without the counter its answer would land on the
+   * new board and play a move from a position that no longer exists.
+   */
+  private startObservation(): void {
+    this.observeRun++;
+    this.clearObserveTimer();
+    this.botManager.cancelPending();
+    this.botThinking = false;
+    this.stopAutoPlay();
+
+    this.mode = 'observe';
+    this.boardSize = this.observeSize;
+    this.isScoringPhase = false;
+    this.deadStones.clear();
+    this.scoringResult = null;
+    this.aiHint = null;
+    this.replayIndex = -1;
+    this.reviewReport = null;
+    this.reviewSource = null;
+    this.activeAlternative = null;
+    this.isSandboxMode = false;
+    this.isChallengeMode = false;
+    this.influenceCache = null;
+    this.replayBoardCache = null;
+    this.handicap = 0;
+    if (this.touchPending) this.clearTouchPending();
+
+    this.observeCommentaries = [];
+    this.observeIndex = -1;
+    this.observePaused = false;
+
+    this.board.reset(this.boardSize);
+    this.komi = this.boardSize === 9 ? 5.5 : 6.5;
+
+    this.setReviewModeUI(false);
+    this.resetClocks();
+    this.updatePlayerNames();
+    this.updateBoardSize(this.boardSize);
+    this.updateUI();
+    this.renderObserveCommentary();
+    this.renderObserveFeed();
+    this.updateObserveControls();
+    this.render();
+
+    void this.playObserverMove();
+  }
+
+  /** Thinks, plays, narrates. One move of the exhibition. */
+  private async playObserverMove(): Promise<void> {
+    if (this.mode !== 'observe' || this.board.isGameOver || this.botThinking) return;
+
+    const run = this.observeRun;
+    const thinkingFor = this.board.turn;
+    this.botThinking = true;
+    this.setObserveThinking(thinkingFor);
+
+    let res = null;
+    try {
+      res = await this.botManager.getMove(this.board, thinkingFor, this.observeLevel, this.komi, {
+        opponentPassed: this.board.lastMove?.pass === true
+      });
+    } catch (e) {
+      console.error('Error during observer move:', e);
+    } finally {
+      this.botThinking = false;
+    }
+
+    // The viewer may have restarted, changed settings or left the mode while
+    // the engine was thinking. Anything that arrives late is discarded.
+    if (run !== this.observeRun || this.mode !== 'observe') return;
+    if (!res || this.board.turn !== thinkingFor || this.board.isGameOver) {
+      this.updateObserveControls();
+      return;
+    }
+
+    const before = this.board.clone();
+    let move: Move;
+
+    if (res.bestMove === null) {
+      move = this.board.pass(thinkingFor);
+      this.sound.playPass();
+    } else {
+      const played = this.board.playMove(res.bestMove.x, res.bestMove.y, thinkingFor);
+      if (played.success && played.move) {
+        move = played.move;
+        this.sound.playStoneClick();
+        if (move.captured?.length) this.sound.playCapture();
+      } else {
+        // Should not happen; passing keeps the exhibition moving if it does.
+        console.warn('Observer engine proposed an illegal move:', res.bestMove, played.reason);
+        move = this.board.pass(thinkingFor);
+      }
+    }
+
+    this.observeCommentaries.push(
+      MoveNarrator.narrate(before, this.board, move, this.board.movesList.length, {
+        winRate: res.winRate,
+        scoreLead: res.scoreLead,
+        candidateMoves: res.candidateMoves
+      })
+    );
+
+    this.observeIndex = -1;
+    this.replayIndex = -1;
+    this.influenceCache = null;
+    this.replayBoardCache = null;
+
+    this.updateUI();
+    this.renderObserveCommentary();
+    this.renderObserveFeed();
+    this.render();
+
+    if (this.board.consecutivePasses >= 2 || this.board.isGameOver) {
+      this.finishObservation();
+      return;
+    }
+
+    this.scheduleObserveNext();
+  }
+
+  /**
+   * Queues the next move after the reading pause. A pace of zero means the
+   * viewer is stepping by hand, so the exhibition parks itself after each move.
+   */
+  private scheduleObserveNext(): void {
+    this.clearObserveTimer();
+
+    if (this.observePaceMs === 0) {
+      this.observePaused = true;
+      this.updateObserveControls();
+      return;
+    }
+    this.updateObserveControls();
+    if (this.observePaused) return;
+
+    const run = this.observeRun;
+    this.observeTimer = window.setTimeout(() => {
+      this.observeTimer = null;
+      if (run !== this.observeRun || this.mode !== 'observe' || this.observePaused) return;
+      void this.playObserverMove();
+    }, this.observePaceMs);
+  }
+
+  private clearObserveTimer(): void {
+    if (this.observeTimer !== null) {
+      clearTimeout(this.observeTimer);
+      this.observeTimer = null;
+    }
+  }
+
+  /**
+   * Pausing never interrupts a search already running: the move being thought
+   * about still lands and gets its commentary, and only the move *after* it is
+   * held back. Cancelling mid-search would throw away seconds of work and leave
+   * the board on a half-finished turn.
+   */
+  private toggleObservePause(): void {
+    if (this.observePaused) {
+      this.observePaused = false;
+      if (this.observeIndex !== -1) this.selectObserveMove(-1);
+      this.updateObserveControls();
+      if (!this.botThinking && !this.board.isGameOver) void this.playObserverMove();
+    } else {
+      this.observePaused = true;
+      this.clearObserveTimer();
+      this.updateObserveControls();
+    }
+  }
+
+  /** Walks the commentary list with the arrow keys. */
+  private stepObserveCommentary(delta: number): void {
+    const total = this.observeCommentaries.length;
+    if (total === 0) return;
+    const current = this.observeIndex === -1 ? total - 1 : this.observeIndex;
+    const next = current + delta;
+    if (next < 0) return;
+    // Stepping past the newest move means asking for the next one to be played.
+    if (next >= total) {
+      this.stepObservation();
+      return;
+    }
+    this.selectObserveMove(next === total - 1 ? -1 : next);
+  }
+
+  /** One move with the exhibition paused. */
+  private stepObservation(): void {
+    if (this.mode !== 'observe' || this.botThinking || this.board.isGameOver) return;
+    if (this.observeIndex !== -1) this.selectObserveMove(-1);
+    void this.playObserverMove();
+  }
+
+  private finishObservation(): void {
+    this.clearObserveTimer();
+    this.observePaused = true;
+    this.updateObserveControls();
+
+    const score = GoScoring.calculateScore(
+      this.board,
+      GoScoring.autoDetectDeadStones(this.board),
+      this.ruleSet,
+      this.komi
+    );
+    const winner =
+      score.winner === 'draw'
+        ? 'Empate (jigo)'
+        : `${score.winner === 'black' ? 'Pretas' : 'Brancas'} por ${score.margin.toFixed(1)}`;
+    this.showStatus(`Fim da exibição — ${winner}. Role a lista para reler qualquer lance.`, '🏁');
+  }
+
+  /** The commentary currently on screen: the newest, or the one clicked. */
+  private currentCommentary(): MoveCommentary | null {
+    if (this.observeCommentaries.length === 0) return null;
+    const idx = this.observeIndex === -1 ? this.observeCommentaries.length - 1 : this.observeIndex;
+    return this.observeCommentaries[idx] ?? null;
+  }
+
+  /**
+   * Shows an earlier move. Looking back pauses the exhibition, because the
+   * board jumping forward under the text being read is worse than useless.
+   */
+  private selectObserveMove(index: number): void {
+    if (index < 0 || index >= this.observeCommentaries.length) {
+      this.observeIndex = -1;
+      this.replayIndex = -1;
+    } else {
+      this.observeIndex = index;
+      this.replayIndex = index + 1;
+      this.observePaused = true;
+      this.clearObserveTimer();
+    }
+
+    this.renderObserveCommentary();
+    this.renderObserveFeed();
+    this.updateObserveControls();
+    this.render();
+  }
+
+  private setObserveThinking(color: Color): void {
+    const side = color === 'black' ? 'Pretas' : 'Brancas';
+    this.showStatus(`${side} pensando (nível ${this.observeLevel})…`, '🤔');
+    const line = document.getElementById('observe-engine-line');
+    if (line) {
+      line.classList.add('thinking');
+      line.textContent = `${side} pensando no lance ${this.board.movesList.length + 1}…`;
+    }
+    this.updateObserveControls();
+  }
+
+  private updateObserveControls(): void {
+    const label = document.getElementById('observe-toggle-label');
+    if (label) label.textContent = this.observePaused ? '▶ Continuar' : '⏸ Pausar';
+
+    const toggle = document.getElementById('btn-observe-toggle') as HTMLButtonElement | null;
+    if (toggle) toggle.disabled = this.board.isGameOver;
+
+    const step = document.getElementById('btn-observe-step') as HTMLButtonElement | null;
+    if (step) step.disabled = this.botThinking || this.board.isGameOver;
+
+    const live = document.getElementById('btn-observe-live');
+    if (live) live.style.display = this.observeIndex === -1 ? 'none' : 'inline-flex';
+
+    const count = document.getElementById('observe-move-count');
+    if (count) count.textContent = String(this.board.movesList.length);
+
+    const paceText =
+      this.observePaceMs === 0 ? 'passo a passo' : `${Math.round(this.observePaceMs / 1000)}s de pausa`;
+    const engineLine = document.getElementById('observe-engine-line');
+    if (engineLine && !this.botThinking) {
+      engineLine.classList.remove('thinking');
+      engineLine.textContent = this.board.isGameOver
+        ? 'Exibição encerrada.'
+        : `Duas IAs no nível ${this.observeLevel}, ${this.observeSize}x${this.observeSize}, ${paceText}.`;
+    }
+
+    const commentary = this.currentCommentary();
+    const phaseBadge = document.getElementById('observe-phase-badge');
+    if (phaseBadge) {
+      phaseBadge.textContent = commentary
+        ? commentary.phase.charAt(0).toUpperCase() + commentary.phase.slice(1)
+        : 'Abertura';
+    }
+
+    const leadEl = document.getElementById('observe-lead');
+    const confEl = document.getElementById('observe-confidence');
+    const lead = commentary?.leadForMover;
+    const conf = commentary?.confidenceForMover;
+
+    if (leadEl) {
+      // Tromp-Taylor area scoring hands every empty point to whoever can reach
+      // it alone, so on a board with two stones it reads "Pretas +75.5" — true
+      // by the rule and useless as a score. The number only means something
+      // once the borders are settled; until then the win rate carries the
+      // judgement on its own.
+      if (!commentary || lead === null || lead === undefined) {
+        leadEl.textContent = '—';
+      } else if (commentary.phase !== 'final') {
+        leadEl.textContent = 'tabuleiro ainda em aberto';
+        leadEl.classList.add('observer-status-soft');
+      } else {
+        // The narrator reports both numbers for whoever just moved; the
+        // scoreboard always names a colour, so flip them back for White.
+        const blackLead = commentary.color === 'black' ? lead : -lead;
+        const side = blackLead >= 0 ? 'Pretas' : 'Brancas';
+        leadEl.textContent = `${side} +${Math.abs(blackLead).toFixed(1)}`;
+        leadEl.classList.remove('observer-status-soft');
+      }
+    }
+
+    if (confEl) {
+      if (!commentary || conf === null || conf === undefined) {
+        confEl.textContent = '—';
+      } else {
+        const blackConf = commentary.color === 'black' ? conf : 1 - conf;
+        const side = blackConf >= 0.5 ? 'Pretas' : 'Brancas';
+        const pct = Math.round(Math.max(blackConf, 1 - blackConf) * 100);
+        confEl.textContent = `${side} ${pct}%`;
+      }
+    }
+  }
+
+  private renderObserveCommentary(): void {
+    const commentary = this.currentCommentary();
+
+    const title = document.getElementById('observe-move-title');
+    const stone = document.getElementById('observe-move-stone');
+    const headline = document.getElementById('observe-headline');
+    const why = document.getElementById('observe-why');
+    const when = document.getElementById('observe-when');
+    const badge = document.getElementById('observe-archetype-badge');
+    const conceptWrap = document.getElementById('observe-concept-wrap');
+    const altHeader = document.getElementById('observe-alt-header');
+    const altList = document.getElementById('observe-alternatives');
+
+    if (!title || !headline || !why || !when || !conceptWrap || !altList) return;
+
+    if (!commentary) {
+      title.textContent = 'Aguardando o primeiro lance…';
+      headline.textContent = '';
+      why.textContent = 'A IA está pensando. Assim que o lance sair, o motivo aparece aqui.';
+      when.textContent = '';
+      if (badge) badge.textContent = '—';
+      conceptWrap.textContent = '';
+      altList.textContent = '';
+      if (altHeader) altHeader.style.display = 'none';
+      return;
+    }
+
+    const side = commentary.color === 'black' ? 'Pretas' : 'Brancas';
+    title.textContent = `Lance ${commentary.moveNumber} (${side}): ${commentary.coord}`;
+
+    // On a phone the banner sits above the board while the full commentary is
+    // further down, so it carries the headline. Without this it kept showing
+    // "pensando" long after the move had landed.
+    if (!this.botThinking && !this.board.isGameOver) {
+      this.showStatus(
+        `Lance ${commentary.moveNumber} (${side}) ${commentary.coord} — ${commentary.headline}`,
+        commentary.color === 'black' ? '⚫' : '⚪'
+      );
+    }
+    if (stone) {
+      stone.className =
+        `player-stone-indicator ${commentary.color === 'black' ? 'stone-black-bg' : 'stone-white-bg'}`;
+    }
+    headline.textContent = commentary.headline;
+    why.textContent = commentary.why;
+    when.textContent = commentary.when;
+    if (badge) badge.textContent = commentary.archetype.replace(/-/g, ' ');
+
+    conceptWrap.textContent = '';
+    const concept = CONCEPTS[commentary.concept];
+    if (concept) {
+      const chip = document.createElement('button');
+      chip.className = 'concept-chip';
+      chip.type = 'button';
+      chip.textContent = `📖 ${concept.name}`;
+      chip.title = concept.short;
+      chip.addEventListener('click', () => this.openGlossary(commentary.concept));
+      conceptWrap.appendChild(chip);
+    }
+
+    altList.textContent = '';
+    if (altHeader) altHeader.style.display = commentary.alternatives.length > 0 ? 'block' : 'none';
+
+    const letters = ['A', 'B', 'C'];
+    commentary.alternatives.forEach((alt, idx) => {
+      const card = document.createElement('div');
+      card.className = 'alt-move-card';
+
+      const left = document.createElement('div');
+      const label = document.createElement('strong');
+      label.style.color = '#10b981';
+      label.textContent = `[${letters[idx] ?? idx + 1}] ${alt.coord} `;
+      const note = document.createElement('span');
+      note.style.color = 'var(--text-secondary)';
+      note.style.fontSize = '12px';
+      note.textContent = alt.note;
+      left.append(label, note);
+
+      card.appendChild(left);
+      altList.appendChild(card);
+    });
+  }
+
+  private renderObserveFeed(): void {
+    const feed = document.getElementById('observe-feed');
+    const count = document.getElementById('observe-feed-count');
+    if (!feed) return;
+
+    const total = this.observeCommentaries.length;
+    if (count) count.textContent = `${total} ${total === 1 ? 'lance' : 'lances'}`;
+
+    feed.textContent = '';
+    const fragment = document.createDocumentFragment();
+    const activeIdx = this.observeIndex === -1 ? total - 1 : this.observeIndex;
+
+    this.observeCommentaries.forEach((c, idx) => {
+      const entry = document.createElement('button');
+      entry.type = 'button';
+      entry.className = `observer-feed-entry ${idx === activeIdx ? 'active' : ''}`;
+
+      const num = document.createElement('span');
+      num.className = 'observer-feed-num';
+      num.textContent = `${c.moveNumber}.`;
+
+      const dot = document.createElement('span');
+      dot.className = `observer-feed-stone ${c.color === 'black' ? 'stone-black-bg' : 'stone-white-bg'}`;
+
+      const coord = document.createElement('span');
+      coord.className = 'observer-feed-coord';
+      coord.textContent = c.coord;
+
+      const kind = document.createElement('span');
+      kind.className = 'observer-feed-kind';
+      kind.textContent = c.headline;
+
+      entry.append(num, dot, coord, kind);
+      entry.addEventListener('click', () => this.selectObserveMove(idx));
+      fragment.appendChild(entry);
+    });
+
+    feed.appendChild(fragment);
+
+    // Follow the newest move, but leave the scroll alone while the viewer is
+    // reading an earlier one.
+    if (this.observeIndex === -1) feed.scrollTop = feed.scrollHeight;
+  }
+
+
+  /**
+   * Stops the exhibition without wiping it: the commentaries stay, so coming
+   * back to the tab lands on the game that was running.
+   */
+  private stopObservation(): void {
+    this.observeRun++;
+    this.clearObserveTimer();
+    this.observePaused = true;
+    this.botManager.cancelPending();
+    this.botThinking = false;
+  }
+
+  private bindObserverControls(): void {
+    document.getElementById('btn-observe-toggle')?.addEventListener('click', () => this.toggleObservePause());
+    document.getElementById('btn-observe-step')?.addEventListener('click', () => this.stepObservation());
+    document.getElementById('btn-observe-live')?.addEventListener('click', () => this.selectObserveMove(-1));
+    document.getElementById('btn-observe-restart')?.addEventListener('click', () => this.startObservation());
+
+    document.getElementById('btn-observe-setup')?.addEventListener('click', () => {
+      this.setSegmentedVal('control-observe-size', String(this.observeSize));
+      const level = document.getElementById('select-observe-level') as HTMLSelectElement | null;
+      if (level) level.value = String(this.observeLevel);
+      const pace = document.getElementById('select-observe-pace') as HTMLSelectElement | null;
+      if (pace) pace.value = String(this.observePaceMs);
+      this.openModal('modal-observe-setup');
+    });
+
+    this.bindSegmentedControl('control-observe-size');
+
+    document.getElementById('btn-observe-apply')?.addEventListener('click', () => {
+      const size = Number(this.getSegmentedVal('control-observe-size') || this.observeSize);
+      if (size === 9 || size === 13 || size === 19) this.observeSize = size;
+
+      const level = document.getElementById('select-observe-level') as HTMLSelectElement | null;
+      if (level) this.observeLevel = Number(level.value) || 5;
+
+      const pace = document.getElementById('select-observe-pace') as HTMLSelectElement | null;
+      if (pace) this.observePaceMs = Number(pace.value);
+
+      this.saveSettings();
+      this.closeModal('modal-observe-setup');
+      this.startObservation();
+    });
+
+    // The board toggles are duplicated in the observer bar so the viewer does
+    // not have to leave the mode to turn coordinates on.
+    document.getElementById('btn-observe-toggle-numbers')?.addEventListener('click', () => {
+      this.showMoveNumbers = !this.showMoveNumbers;
+      this.saveSettings();
+      this.render();
+    });
+    document.getElementById('btn-observe-toggle-coords')?.addEventListener('click', () => {
+      this.showCoordinates = !this.showCoordinates;
+      this.saveSettings();
+      this.render();
+    });
+  }
+
   private handlePass(): void {
     if (this.board.isGameOver || this.isScoringPhase) return;
     if (this.mode === 'review' || this.mode === 'tsumego' || this.mode === 'joseki') return;
-    if (this.mode === 'eve') return;
+    if (this.mode === 'eve' || this.mode === 'observe') return;
     if (this.mode === 'pve' && (this.botThinking || this.board.turn !== this.playerColor)) return;
 
     const passer = this.board.turn;
@@ -1091,6 +1646,7 @@ export class App {
   private handleResign(): void {
     if (this.board.isGameOver || this.isScoringPhase) return;
     if (this.mode === 'review' || this.mode === 'tsumego' || this.mode === 'joseki') return;
+    if (this.mode === 'observe') return;
 
     const resigningColor = this.mode === 'pve' ? this.playerColor : this.board.turn;
     if (!window.confirm('Tem certeza de que deseja desistir da partida?')) return;
@@ -1263,17 +1819,31 @@ export class App {
     };
 
     if (this.touchPending) this.clearTouchPending();
+
+    // Three shapes now share this layout: playing, reviewing and watching.
+    const isObserve = !isReview && this.mode === 'observe';
+
     show('live-player-cards', !isReview, 'flex');
     show('review-summary-card', isReview);
-    show('live-eval-card', !isReview);
-    show('territory-widget-card', !isReview);
-    show('board-quick-controls', !isReview, 'flex');
+    show('live-eval-card', !isReview && !isObserve);
+    show('territory-widget-card', !isReview && !isObserve);
+    show('board-quick-controls', !isReview && !isObserve, 'flex');
     show('review-quick-controls', isReview, 'flex');
     show('review-move-details-card', isReview);
     show('winrate-chart-card', isReview, 'flex');
 
+    // The observer has its own control bar, its own commentary card and its own
+    // move list; the plain history and the SGF tools would only be noise there.
+    show('observe-quick-controls', isObserve, 'flex');
+    show('observe-status-card', isObserve);
+    show('observe-commentary-card', isObserve);
+    show('observe-feed-card', isObserve);
+    show('moves-history-card', !isObserve, 'flex');
+    show('sgf-tools-card', !isObserve);
+
     document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-    document.getElementById(isReview ? 'tab-review' : 'tab-play')?.classList.add('active');
+    const activeTab = isReview ? 'tab-review' : isObserve ? 'tab-observe' : 'tab-play';
+    document.getElementById(activeTab)?.classList.add('active');
     if (isReview) this.showStatus('Modo de Revisão ativo. Navegue pelos lances abaixo.', '📊');
 
     // No celular só um painel aparece por vez, então os rótulos acompanham o
@@ -1281,9 +1851,9 @@ export class App {
     // do lance, senão "Próx. Erro" mudaria um card fora da tela.
     const infoTab = document.querySelector<HTMLElement>('.panel-switch-btn[data-panel="info"]');
     const analysisTab = document.querySelector<HTMLElement>('.panel-switch-btn[data-panel="analysis"]');
-    if (infoTab) infoTab.textContent = isReview ? 'Relatório' : 'Partida';
-    if (analysisTab) analysisTab.textContent = isReview ? 'Análise' : 'Histórico';
-    this.setMobilePanel(isReview ? 'analysis' : 'info');
+    if (infoTab) infoTab.textContent = isReview ? 'Relatório' : isObserve ? 'Exibição' : 'Partida';
+    if (analysisTab) analysisTab.textContent = isReview ? 'Análise' : isObserve ? 'Comentário' : 'Histórico';
+    this.setMobilePanel(isReview || isObserve ? 'analysis' : 'info');
 
     this.updateBoardSize();
   }
@@ -2331,6 +2901,8 @@ export class App {
     // Leaving a live game in progress should be a deliberate choice.
     const hasLiveGame = this.board.movesList.length > 0 && !this.board.isGameOver && this.mode !== 'review';
     const leavingPlay = tabName !== 'play' && (this.mode === 'pve' || this.mode === 'pvp' || this.mode === 'eve');
+    // Leaving the exhibition costs nothing — it is not the viewer's game.
+    if (tabName !== 'observe' && this.mode === 'observe') this.stopObservation();
     if (hasLiveGame && leavingPlay && !window.confirm('Sair da partida atual? O progresso será perdido.')) {
       document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
       document.getElementById(this.mode === 'review' ? 'tab-review' : 'tab-play')?.classList.add('active');
@@ -2360,6 +2932,16 @@ export class App {
         await this.startPostGameReview();
       } else {
         this.openReviewLibrary();
+      }
+    } else if (tabName === 'observe') {
+      if (specialCard) specialCard.style.display = 'none';
+      // Coming back to a finished or running exhibition keeps it; otherwise a
+      // fresh one starts, so the tab always lands on something to watch.
+      if (this.mode === 'observe' && this.observeCommentaries.length > 0) {
+        this.setReviewModeUI(false);
+        this.render();
+      } else {
+        this.startObservation();
       }
     } else if (tabName === 'tsumego') {
       this.mode = 'tsumego';
@@ -2753,6 +3335,8 @@ export class App {
         this.mode === 'review' ||
         this.mode === 'tsumego' ||
         this.mode === 'joseki' ||
+        // Watching is not a timed game; a ticking clock would just run out.
+        this.mode === 'observe' ||
         this.board.movesList.length === 0;
 
       if (paused) {
@@ -3002,6 +3586,14 @@ export class App {
     const isLive = this.replayIndex === -1;
     const inf = this.showInfluenceMap && isLive ? this.getInfluence() : undefined;
 
+    // In observer mode the board illustrates the text: the points the comment
+    // talks about get a ring, and the engine's runners-up get A/B/C markers.
+    const commentary = this.mode === 'observe' ? this.currentCommentary() : null;
+    const played = commentary && commentary.highlights.length > 0 ? commentary.highlights[0] : null;
+    const rings = commentary
+      ? commentary.highlights.filter(p => !played || p.x !== played.x || p.y !== played.y)
+      : undefined;
+
     this.renderer.render(board, {
       theme: this.theme,
       showCoordinates: this.showCoordinates,
@@ -3018,13 +3610,20 @@ export class App {
       deadStones: this.deadStones,
       territoryMap: this.scoringResult?.territoryMap,
       isScoringPhase: this.isScoringPhase,
-      interactive: isLive && this.canPlayNow()
+      interactive: isLive && this.canPlayNow(),
+      highlightPoints: rings && rings.length > 0 ? rings : undefined,
+      reviewAlternatives: commentary?.alternatives.map(alt => ({
+        point: alt.point,
+        winRate: 0,
+        scoreLead: 0,
+        description: alt.note
+      }))
     });
   }
 
   private canPlayNow(): boolean {
     if (this.board.isGameOver || this.isScoringPhase) return false;
-    if (this.mode === 'eve' || this.mode === 'joseki') return false;
+    if (this.mode === 'eve' || this.mode === 'joseki' || this.mode === 'observe') return false;
     if (this.mode === 'pve') return !this.botThinking && this.board.turn === this.playerColor;
     return true;
   }

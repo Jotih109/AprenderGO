@@ -64,6 +64,15 @@ qualquer hospedagem gratuita serve:
 - **Partidas** contra a IA (5 níveis), contra outra pessoa no mesmo computador,
   ou IA contra IA. Tabuleiros 9x9, 13x13 e 19x19, com handicap de 2 a 9 pedras.
 - **Relógios** byo-yomi, Fischer (com incremento aplicado a cada lance) e absoluto.
+- **Modo Observador**: duas instâncias da IA jogam entre si e cada lance vem
+  com o motivo. O comentário diz de que *tipo* é o lance (corte, fuga de atari,
+  fecho de canto, invasão, tenuki, fim de jogo…), **por que ali e agora** — com
+  os números lidos do próprio tabuleiro, tipo "o grupo branco de 3 pedras fica
+  com uma liberdade" — e **quando jogar assim**, que é a lição que você leva
+  para as suas partidas. Junto vêm as alternativas que a busca considerou,
+  marcadas no tabuleiro, e o conceito de Go que o lance ensina, com link para o
+  glossário. Dá para pausar, avançar lance a lance e clicar em qualquer lance
+  passado para reler o comentário com o tabuleiro naquela posição.
 - **Análise pós-jogo pensada para aprender**: além de classificar cada lance,
   a revisão explica *o que aconteceu no tabuleiro* em português simples —
   "você ignorou um atari de 2 pedras, o adversário captura jogando em C9".
@@ -91,6 +100,7 @@ src/
     BotManager.ts     Ponte entre a interface e o worker, com cancelamento
     GameReviewer.ts   Análise pós-jogo e classificação de lances
     MoveInsights.ts   Explicações didáticas derivadas do tabuleiro
+    MoveNarrator.ts   Comentário do modo observador: tipo do lance, porquê e quando
   core/
     GoBoard.ts        Regras: capturas, suicídio, ko, superko posicional
     GoScoring.ts      Contagem japonesa e chinesa, vida incondicional (Benson)
@@ -123,6 +133,27 @@ A avaliação de posição usada pela revisão é a média ponderada por visitas
 todos os lances da raiz, e não o valor do melhor lance. O valor do melhor lance
 é o máximo de várias estimativas ruidosas e por isso é enviesado para cima nas
 duas pontas de uma comparação: usá-lo fazia *todo* lance parecer um erro.
+
+## Sobre o comentário do modo observador
+
+O comentário não sai do resultado da busca: ele sai da diferença entre a posição
+antes e depois do lance. O narrador compara as duas, escolhe **um** arquétipo
+(o mais concreto vence — um lance que captura *e* conecta é uma captura) e
+escreve duas frases separadas de propósito:
+
+- **Por que aqui, agora** fala só desta posição, e cada número que aparece foi
+  medido: contagem de liberdades, tamanho dos grupos, quantos grupos distintos
+  encostam no ponto, distância até a borda, distância até o último lance.
+- **Quando jogar assim** é fixo por arquétipo — é a regra geral que aquele tipo
+  de lance ensina, escrita para valer em qualquer partida.
+
+Dois casos merecem nota. "Vivo" só é dito quando o algoritmo de Benson confirma
+vida incondicional; a contagem barata de olhos, que se engana com olhos falsos,
+aparece no texto como "espaços cercados". E o placar em pontos fica escondido
+até o fim de jogo: a pontuação por área entrega todo ponto vazio a quem o
+alcança sozinho, então num tabuleiro com duas pedras ela diz "Pretas +75,5" —
+verdade pela regra e inútil como placar. Até lá, quem responde é a chance de
+vitória da busca.
 
 ## Sobre as explicações da revisão
 

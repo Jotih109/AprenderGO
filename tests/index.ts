@@ -5,6 +5,7 @@ import { runSgfTests } from './sgf.test';
 import { runEngineTests } from './engine.test';
 import { runInsightTests } from './insights.test';
 import { runSummaryTests } from './summary.test';
+import { runNarratorTests } from './narrator.test';
 
 console.log('\nGoBoard');
 runBoardTests();
@@ -20,6 +21,9 @@ runInsightTests();
 
 console.log('\nReviewSummary (resumo textual do sensei)');
 runSummaryTests();
+
+console.log('\nMoveNarrator (comentário do modo observador)');
+runNarratorTests();
 
 console.log('\nSearch engine');
 runEngineTests();

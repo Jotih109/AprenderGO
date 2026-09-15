@@ -40,6 +40,9 @@
       <button class="nav-tab" id="tab-review" data-mode="review" title="Análise Pós-Jogo e Revisão com IA">
         <span class="nav-icon" aria-hidden="true">📊</span><span class="nav-label">Revisão Pós-Jogo</span>
       </button>
+      <button class="nav-tab" id="tab-observe" data-mode="observe" title="Assistir duas IAs jogando, com o porquê de cada lance">
+        <span class="nav-icon" aria-hidden="true">👁️</span><span class="nav-label">Observar</span>
+      </button>
       <button class="nav-tab" id="tab-tsumego" data-mode="tsumego" title="Resolver Desafios de Vida e Morte (Tsumego)">
         <span class="nav-icon" aria-hidden="true">🧩</span><span class="nav-label">Tsumego</span>
       </button>
@@ -181,6 +184,29 @@
         </div>
       </div>
 
+      <!-- Placar da Exibição (Modo Observador) -->
+      <div class="card observer-status-card" id="observe-status-card" style="display: none;">
+        <div class="card-title">
+          <span>👁️ Exibição</span>
+          <span id="observe-phase-badge" class="card-subtitle-badge">Abertura</span>
+        </div>
+        <div class="observer-status-grid">
+          <div class="observer-status-box">
+            <div class="observer-status-label">Lance</div>
+            <div class="observer-status-value" id="observe-move-count">0</div>
+          </div>
+          <div class="observer-status-box">
+            <div class="observer-status-label">Chance de vitória</div>
+            <div class="observer-status-value" id="observe-confidence">—</div>
+          </div>
+          <div class="observer-status-box observer-status-wide">
+            <div class="observer-status-label">Placar estimado</div>
+            <div class="observer-status-value" id="observe-lead">—</div>
+          </div>
+        </div>
+        <div class="observer-status-line" id="observe-engine-line">Duas IAs no nível 5, 6s entre os lances.</div>
+      </div>
+
       <!-- Barra de Avaliação em Tempo Real (Modo Ao Vivo) -->
       <div class="card" id="live-eval-card">
         <div class="card-title">
@@ -317,6 +343,36 @@
         </button>
       </div>
 
+      <!-- Barra de Controle do Modo Observador -->
+      <div class="board-quick-controls observer-bar" id="observe-quick-controls" style="display: none;">
+        <div class="review-nav-group">
+          <button id="btn-observe-toggle" class="btn btn-primary btn-sm" title="Pausar ou retomar a partida (Atalho: Espaço)">
+            <span id="observe-toggle-label">⏸ Pausar</span>
+          </button>
+          <button id="btn-observe-step" class="btn btn-secondary btn-sm" title="Avançar um lance com a partida pausada">
+            <span>⏭ Um lance</span>
+          </button>
+          <button id="btn-observe-live" class="btn btn-secondary btn-sm" title="Voltar ao lance mais recente" style="display: none;">
+            <span>⏩ Ao vivo</span>
+          </button>
+        </div>
+
+        <div class="review-nav-group">
+          <button id="btn-observe-restart" class="btn btn-secondary btn-sm" title="Começar uma nova partida entre as IAs">
+            <span>🔁 Nova partida</span>
+          </button>
+          <button id="btn-observe-setup" class="btn btn-secondary btn-sm" title="Tamanho do tabuleiro, força das IAs e ritmo">
+            <span>⚙️ Ajustes</span>
+          </button>
+          <button id="btn-observe-toggle-numbers" class="btn btn-secondary btn-sm" title="Exibir ou ocultar números das jogadas">
+            <span>🔢 Números</span>
+          </button>
+          <button id="btn-observe-toggle-coords" class="btn btn-secondary btn-sm" title="Exibir ou ocultar coordenadas">
+            <span>🔤 Coords</span>
+          </button>
+        </div>
+      </div>
+
       <!-- Barra de Controle e Navegação de Lances (Modo Revisão) -->
       <div class="board-quick-controls review-controller-bar" id="review-quick-controls" style="display: none;">
         <!-- Navegação de Replay -->
@@ -402,6 +458,47 @@
           O que a IA jogaria no lugar:
         </div>
         <div id="review-alternatives-list" class="alternatives-container"></div>
+      </div>
+
+      <!-- Comentário do Lance (Modo Observador) -->
+      <div class="card observer-card" id="observe-commentary-card" style="display: none;">
+        <div class="card-title">
+          <span>Por que este lance</span>
+          <span id="observe-archetype-badge" class="badge-move-eval">—</span>
+        </div>
+
+        <div class="observer-move-head">
+          <span class="player-stone-indicator stone-black-bg" id="observe-move-stone" aria-hidden="true"></span>
+          <strong id="observe-move-title" class="move-title-text">Aguardando o primeiro lance…</strong>
+        </div>
+
+        <div class="observer-headline" id="observe-headline"></div>
+
+        <div class="observer-section">
+          <div class="observer-section-label">Por que aqui, agora</div>
+          <p class="observer-text" id="observe-why"></p>
+        </div>
+
+        <div class="observer-section lesson">
+          <div class="observer-section-label">Quando jogar assim</div>
+          <p class="observer-text" id="observe-when"></p>
+        </div>
+
+        <div id="observe-concept-wrap" class="observer-concept-wrap"></div>
+
+        <div class="alternatives-header" id="observe-alt-header" style="display: none;">
+          A IA também considerou:
+        </div>
+        <div id="observe-alternatives" class="alternatives-container"></div>
+      </div>
+
+      <!-- Lista de Lances Comentados (Modo Observador) -->
+      <div class="card observer-feed-card" id="observe-feed-card" style="display: none;">
+        <div class="card-title">
+          <span>Lances comentados</span>
+          <span id="observe-feed-count" class="history-count-badge">0 lances</span>
+        </div>
+        <div class="move-history-panel observer-feed" id="observe-feed" aria-label="Lances comentados"></div>
       </div>
 
       <!-- Histórico Completo de Jogadas -->
@@ -499,6 +596,66 @@
       <div class="modal-footer">
         <button class="btn btn-secondary modal-close-btn" id="btn-cancel-new-game">Cancelar</button>
         <button class="btn btn-primary" id="btn-start-new-game">Iniciar Partida</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 3.1b: Ajustes do Modo Observador -->
+  <div class="modal-backdrop" id="modal-observe-setup" role="dialog" aria-modal="true">
+    <div class="modal-window">
+      <div class="modal-header">
+        <h3><span>👁️</span> Ajustes da exibição</h3>
+        <button class="btn-icon modal-close-btn" aria-label="Fechar">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc">
+          Duas instâncias da IA jogam entre si e cada lance vem com o motivo
+          por trás dele. Pause quando quiser ler com calma.
+        </p>
+
+        <div class="form-group">
+          <label class="form-label">Tamanho do Tabuleiro</label>
+          <div class="segmented-control" id="control-observe-size">
+            <button type="button" class="segmented-btn" data-val="9">9x9 (rápido)</button>
+            <button type="button" class="segmented-btn active" data-val="13">13x13</button>
+            <button type="button" class="segmented-btn" data-val="19">19x19 (oficial)</button>
+          </div>
+          <div class="form-hint">
+            No 9x9 a partida inteira cabe em poucos minutos e cada lance conta;
+            o 19x19 mostra a estratégia completa, mas demora bem mais.
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="select-observe-level">Força das IAs</label>
+          <select id="select-observe-level" class="form-select">
+            <option value="5">Nível 5 — a mais forte (4s por lance)</option>
+            <option value="4">Nível 4 — forte (2,6s por lance)</option>
+            <option value="3">Nível 3 — rápida (1,6s por lance)</option>
+          </select>
+          <div class="form-hint">
+            Nível 5 é o máximo deste motor. Num celular, cada lance leva alguns
+            segundos a mais do que no computador.
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="select-observe-pace">Pausa para leitura entre os lances</label>
+          <select id="select-observe-pace" class="form-select">
+            <option value="0">Passo a passo (só avança no botão)</option>
+            <option value="4000">4 segundos</option>
+            <option value="8000" selected>8 segundos</option>
+            <option value="15000">15 segundos</option>
+          </select>
+          <div class="form-hint">
+            Esse tempo é somado ao que a IA leva pensando. Você pode pausar a
+            qualquer momento com a barra de espaço.
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary modal-close-btn">Fechar</button>
+        <button class="btn btn-primary" id="btn-observe-apply">Começar nova exibição</button>
       </div>
     </div>
   </div>
